@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
   // Між createServerClient і getClaims() не додавайте жодної логіки:
   // це може спричинити випадкові виходи з акаунта.
   const { data } = await supabase.auth.getClaims();
-  const isAuthenticated = Boolean(data?.claims);
+  const claims = data?.claims;
   const { pathname } = request.nextUrl;
 
   const redirectTo = (path: string) => {
@@ -60,13 +60,54 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   };
 
-  if (!isAuthenticated && !isPublicPath(pathname)) {
-    return redirectTo("/login");
+  if (!claims) {
+    return isPublicPath(pathname) ? response : redirectTo("/login");
   }
 
-  if (isAuthenticated && pathname === "/login") {
+  // Далі — перевірка онбордингу. Запит до profiles робимо лише для
+  // навігацій на сторінки, а не для статики, Server Actions чи API.
+  const needsOnboardingCheck =
+    pathname === "/login" ||
+    (!isPublicPath(pathname) && !ONBOARDING_EXEMPT_PATHS.includes(pathname));
+  if (!needsOnboardingCheck || !isPageRequest(request)) {
+    return response;
+  }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("onboarded_at")
+    .eq("id", claims.sub)
+    .maybeSingle();
+  // Якщо БД недоступна — не редіректимо (щоб не зациклитись);
+  // сторінки самі перевіряють стан через getCurrentUser().
+  if (error) return response;
+
+  const onboarded = Boolean(profile?.onboarded_at);
+
+  if (pathname === "/login") {
+    return redirectTo(onboarded ? "/" : "/onboarding");
+  }
+  if (!onboarded && pathname !== "/onboarding") {
+    return redirectTo("/onboarding");
+  }
+  if (onboarded && pathname === "/onboarding") {
     return redirectTo("/");
   }
 
   return response;
+}
+
+/**
+ * Захищені сторінки, доступні без онбордингу:
+ * скидання пароля працює через лист і не має вести на /onboarding.
+ */
+const ONBOARDING_EXEMPT_PATHS = ["/reset-password"];
+
+/** Звичайна навігація на сторінку: GET/HEAD без розширення файлу і не API. */
+function isPageRequest(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (request.method !== "GET" && request.method !== "HEAD") return false;
+  if (pathname.startsWith("/api/")) return false;
+  const lastSegment = pathname.slice(pathname.lastIndexOf("/") + 1);
+  return !lastSegment.includes(".");
 }
