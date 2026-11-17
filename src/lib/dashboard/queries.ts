@@ -1,0 +1,242 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { addDays, startOfWeek, toDayKey } from "@/lib/dates";
+import { epley1RM, setVolume } from "@/lib/metrics";
+import type { WeightUnit } from "@/lib/units";
+import type { Database } from "@/types/database.types";
+
+type Client = SupabaseClient<Database>;
+
+export type ProgressPoint = {
+  /** Початок тренування, ISO. */
+  date: string;
+  /** Найкраща оцінка 1ПМ за тренування, кг. */
+  oneRmKg: number;
+};
+
+export type DashboardData = {
+  displayName: string | null;
+  unit: WeightUnit;
+  program: { id: string; name: string } | null;
+  today: { id: string; name: string } | null;
+  /** Незавершене тренування (кнопка "Continue workout"). */
+  activeWorkout: { id: string; name: string } | null;
+  week: { volumeKg: number; workouts: number };
+  streakWeeks: number;
+  progress: { exerciseName: string; points: ProgressPoint[] } | null;
+};
+
+/** Скільки завершених тренувань читаємо для "сьогоднішнього дня" і серії. */
+const RECENT_WORKOUTS_LIMIT = 500;
+/** Графік показує максимум рік. */
+const PROGRESS_DAYS = 366;
+
+/**
+ * Усі дані дашборду. Запити йдуть двома паралельними хвилями
+ * (третя — лише якщо в сьогоднішньому дні немає вправ):
+ *  1) профіль з активною програмою, днями й вправами + завершені тренування;
+ *  2) підходи поточного тижня + підходи вправи для графіка.
+ */
+export async function getDashboardData(
+  supabase: Client,
+  userId: string,
+  now = new Date(),
+): Promise<DashboardData> {
+  const [profileRes, workoutsRes, activeRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        `display_name, unit,
+         program:programs!profiles_active_program_id_fkey (
+           id, name,
+           program_days ( id, name, position,
+             program_exercises ( position, exercise_id, exercises ( name ) )
+           )
+         )`,
+      )
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("workouts")
+      .select("id, program_day_id, started_at")
+      .eq("user_id", userId)
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .limit(RECENT_WORKOUTS_LIMIT),
+    supabase
+      .from("workouts")
+      .select("id, name")
+      .eq("user_id", userId)
+      .eq("status", "in_progress")
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (profileRes.error) throw profileRes.error;
+  if (workoutsRes.error) throw workoutsRes.error;
+  if (activeRes.error) throw activeRes.error;
+
+  const profile = profileRes.data;
+  const workouts = workoutsRes.data;
+  const program = profile?.program ?? null;
+  const days = [...(program?.program_days ?? [])].sort(
+    (a, b) => a.position - b.position,
+  );
+
+  // --- Сьогоднішній день: наступний по колу після останнього тренування програми
+  const todayDay = pickNextDay(days, workouts);
+
+  // --- Тиждень і серія (тижні з понеділка, у поясі користувача)
+  const currentWeek = startOfWeek(toDayKey(now));
+  const weeksWithWorkouts = new Set<string>();
+  const thisWeekIds: string[] = [];
+  for (const w of workouts) {
+    const week = startOfWeek(toDayKey(w.started_at));
+    weeksWithWorkouts.add(week);
+    if (week === currentWeek) thisWeekIds.push(w.id);
+  }
+  const streakWeeks = countWeekStreak(weeksWithWorkouts, currentWeek);
+
+  // --- Вправа для графіка: позиція 0 сьогоднішнього дня
+  const firstExercise = todayDay?.program_exercises
+    .slice()
+    .sort((a, b) => a.position - b.position)[0];
+  const progressSince = new Date(
+    now.getTime() - PROGRESS_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const [weekVolumeKg, progress] = await Promise.all([
+    getVolumeKg(supabase, thisWeekIds),
+    firstExercise
+      ? getProgressPoints(supabase, firstExercise.exercise_id, progressSince).then(
+          (points) => ({
+            exerciseName: firstExercise.exercises?.name ?? "Exercise",
+            points,
+          }),
+        )
+      : workouts.length > 0
+        ? getMostFrequentExerciseProgress(supabase, progressSince)
+        : Promise.resolve(null),
+  ]);
+
+  return {
+    displayName: profile?.display_name ?? null,
+    unit: profile?.unit ?? "kg",
+    program: program ? { id: program.id, name: program.name } : null,
+    today: todayDay ? { id: todayDay.id, name: todayDay.name } : null,
+    activeWorkout: activeRes.data,
+    week: { volumeKg: weekVolumeKg, workouts: thisWeekIds.length },
+    streakWeeks,
+    progress,
+  };
+}
+
+/**
+ * "Сьогоднішній" день програми: наступний по колу після дня останнього
+ * завершеного тренування цієї програми; без таких тренувань — перший день.
+ * @param days дні програми, відсортовані за position
+ * @param workouts завершені тренування від найновішого (досить тих, що з днями програми)
+ */
+export function pickNextDay<D extends { id: string }>(
+  days: D[],
+  workouts: { program_day_id: string | null }[],
+): D | null {
+  if (days.length === 0) return null;
+  const dayIndexById = new Map(days.map((d, i) => [d.id, i]));
+  const last = workouts.find(
+    (w) => w.program_day_id !== null && dayIndexById.has(w.program_day_id),
+  );
+  return last ? days[(dayIndexById.get(last.program_day_id!)! + 1) % days.length] : days[0];
+}
+
+/**
+ * Кількість тижнів поспіль із хоча б одним тренуванням. Рахуємо від
+ * поточного тижня, а якщо в ньому ще не тренувались — від попереднього
+ * (серія не обривається в понеділок зранку).
+ */
+export function countWeekStreak(weeks: Set<string>, currentWeek: string) {
+  let week = weeks.has(currentWeek) ? currentWeek : addDays(currentWeek, -7);
+  let streak = 0;
+  while (weeks.has(week)) {
+    streak++;
+    week = addDays(week, -7);
+  }
+  return streak;
+}
+
+/** Тоннаж виконаних підходів у заданих (завершених) тренуваннях, кг. */
+async function getVolumeKg(supabase: Client, workoutIds: string[]) {
+  if (workoutIds.length === 0) return 0;
+  const { data, error } = await supabase
+    .from("workout_sets")
+    .select("weight, reps")
+    .in("workout_id", workoutIds)
+    .eq("is_completed", true);
+  if (error) throw error;
+  return data.reduce((sum, s) => sum + setVolume(s.weight, s.reps), 0);
+}
+
+/** Найкраща оцінка 1ПМ вправи за кожне завершене тренування, від старих до нових. */
+async function getProgressPoints(
+  supabase: Client,
+  exerciseId: string,
+  since: string,
+): Promise<ProgressPoint[]> {
+  const { data, error } = await supabase
+    .from("workout_sets")
+    .select("weight, reps, workout_id, workouts!inner ( started_at, status )")
+    .eq("exercise_id", exerciseId)
+    .eq("is_completed", true)
+    .eq("workouts.status", "completed")
+    .gte("workouts.started_at", since)
+    .limit(1000);
+  if (error) throw error;
+
+  const best = new Map<string, ProgressPoint>();
+  for (const s of data) {
+    const oneRmKg = epley1RM(s.weight, s.reps);
+    const current = best.get(s.workout_id);
+    if (!current || oneRmKg > current.oneRmKg) {
+      best.set(s.workout_id, { date: s.workouts.started_at, oneRmKg });
+    }
+  }
+  return [...best.values()]
+    .filter((p) => p.oneRmKg > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Запасний варіант: вправа, що трапляється в найбільшій кількості тренувань. */
+async function getMostFrequentExerciseProgress(supabase: Client, since: string) {
+  const { data, error } = await supabase
+    .from("workout_sets")
+    .select("exercise_id, workout_id, exercises ( name ), workouts!inner ( status, started_at )")
+    .eq("is_completed", true)
+    .eq("workouts.status", "completed")
+    .gte("workouts.started_at", since)
+    .limit(1000);
+  if (error) throw error;
+
+  const workoutsByExercise = new Map<string, { name: string; ids: Set<string> }>();
+  for (const s of data) {
+    let entry = workoutsByExercise.get(s.exercise_id);
+    if (!entry) {
+      entry = { name: s.exercises?.name ?? "Exercise", ids: new Set() };
+      workoutsByExercise.set(s.exercise_id, entry);
+    }
+    entry.ids.add(s.workout_id);
+  }
+
+  let topId: string | null = null;
+  let topCount = 0;
+  for (const [id, entry] of workoutsByExercise) {
+    if (entry.ids.size > topCount) {
+      topId = id;
+      topCount = entry.ids.size;
+    }
+  }
+  if (!topId) return null;
+
+  return {
+    exerciseName: workoutsByExercise.get(topId)!.name,
+    points: await getProgressPoints(supabase, topId, since),
+  };
+}
