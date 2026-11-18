@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Suggestion } from "@/lib/progression";
 import { clampReps, clampWeightKg, REPS_MAX, WEIGHT_MAX_KG } from "@/lib/workout/derive";
+import { formatSuggestionReason } from "@/lib/workout/suggestion-text";
 import type { Equipment, MuscleGroup, WorkoutExercise } from "@/lib/workout/types";
 import {
   formatWeight,
@@ -101,17 +102,13 @@ export function SuggestionBanner({
       tone = "bg-white/10 text-foreground";
       break;
     default:
-      text = suggestion.reason;
+      text = formatSuggestionReason(suggestion, exercise, unit);
       tone = "bg-white/10 text-foreground";
   }
 
-  // Пояснення алгоритму містить вагу в кг — для lb підставляємо свою.
+  // Для 'none' пояснення вже на самій плашці.
   const reason =
-    suggestion.action === "none"
-      ? null
-      : suggestion.action === "same" && unit === "lb"
-        ? `Keep ${weight} until all sets reach ${exercise.repMax} reps`
-        : suggestion.reason;
+    suggestion.action === "none" ? null : formatSuggestionReason(suggestion, exercise, unit);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>

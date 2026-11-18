@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { historyBest, type PersonalBest, type Session } from "@/lib/progression";
 import type { Database } from "@/types/database.types";
+import type { ExerciseSession } from "./records";
 import {
   ADDED_EXERCISE_DEFAULTS,
   type Equipment,
@@ -19,26 +20,41 @@ const HISTORY_ROWS_LIMIT = 5000;
 
 export type ExerciseHistory = { history: Session[]; best: PersonalBest | null };
 
+/** Зріз історії «на момент» тренування (для підсумку старого тренування). */
+export type HistoryCutoff = {
+  /** Лише тренування, що почалися не пізніше (started_at ≤). */
+  startedAtOrBefore: string;
+  /** Тренування, яке з історії виключаємо (саме поточне). */
+  excludeWorkoutId: string;
+};
+
 /**
- * Історія ЗАВЕРШЕНИХ тренувань для набору вправ — одним запитом (без N+1).
+ * Завершені тренування кожної вправи з набору — одним запитом (без N+1).
  * Працює і з серверним, і з браузерним клієнтом: доступ до чужих тренувань
- * відсікає RLS. Повертає для кожної вправи два останні тренування
- * (від найновішого) і найкращі показники за всю історію.
+ * відсікає RLS. Тренування — від найновішого, підходи — за номером.
+ * `cutoff` — лише історія ДО заданого тренування (екран підсумку).
  */
-export async function loadExerciseHistory(
+export async function loadExerciseSessions(
   supabase: Client,
   exerciseIds: string[],
-): Promise<Map<string, ExerciseHistory>> {
-  const result = new Map<string, ExerciseHistory>();
+  cutoff?: HistoryCutoff,
+): Promise<Map<string, ExerciseSession[]>> {
+  const result = new Map<string, ExerciseSession[]>();
   if (exerciseIds.length === 0) return result;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("workout_sets")
     .select(
       "exercise_id, workout_id, set_number, weight, reps, is_completed, workouts!inner ( started_at, status )",
     )
     .in("exercise_id", exerciseIds)
-    .eq("workouts.status", "completed")
+    .eq("workouts.status", "completed");
+  if (cutoff) {
+    query = query
+      .lte("workouts.started_at", cutoff.startedAtOrBefore)
+      .neq("workout_id", cutoff.excludeWorkoutId);
+  }
+  const { data, error } = await query
     .order("workouts(started_at)", { ascending: false })
     .limit(HISTORY_ROWS_LIMIT);
   if (error) throw error;
@@ -63,15 +79,42 @@ export async function loadExerciseHistory(
   }
 
   for (const [exerciseId, byWorkout] of grouped) {
-    const sessions: Session[] = [...byWorkout.values()]
-      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-      .map((s) => ({ sets: s.sets.sort((a, b) => a.n - b.n).map((x) => x.set) }));
+    result.set(
+      exerciseId,
+      [...byWorkout.entries()]
+        .sort(([, a], [, b]) => b.startedAt.localeCompare(a.startedAt))
+        .map(([workoutId, s]) => ({
+          workoutId,
+          startedAt: s.startedAt,
+          sets: s.sets.sort((a, b) => a.n - b.n).map((x) => x.set),
+        })),
+    );
+  }
+  return result;
+}
+
+/** Тренування вправ → два останні (від найновішого) + найкращі показники за всю історію. */
+export function toExerciseHistory(sessions: Map<string, ExerciseSession[]>) {
+  const result = new Map<string, ExerciseHistory>();
+  for (const [exerciseId, list] of sessions) {
     result.set(exerciseId, {
-      history: sessions.slice(0, RECENT_SESSIONS),
-      best: historyBest(sessions),
+      history: list.slice(0, RECENT_SESSIONS).map((s) => ({ sets: s.sets })),
+      best: historyBest(list),
     });
   }
   return result;
+}
+
+/**
+ * Історія ЗАВЕРШЕНИХ тренувань для набору вправ — одним запитом (без N+1):
+ * для кожної вправи два останні тренування і найкращі показники за всю історію.
+ */
+export async function loadExerciseHistory(
+  supabase: Client,
+  exerciseIds: string[],
+  cutoff?: HistoryCutoff,
+): Promise<Map<string, ExerciseHistory>> {
+  return toExerciseHistory(await loadExerciseSessions(supabase, exerciseIds, cutoff));
 }
 
 type ExerciseRow = {

@@ -111,7 +111,38 @@ export async function finishWorkout(
   }
 
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/workouts");
+  revalidatePath("/progress");
+  redirect(`/workout/${workoutId}/summary`);
+}
+
+export type NotesActionResult = { ok: true; notes: string } | { ok: false; error: string };
+
+/** Редагування нотатки завершеного тренування (екран підсумку). */
+export async function updateWorkoutNotes(
+  workoutId: string,
+  notes: string,
+): Promise<NotesActionResult> {
+  const { supabase, userId } = await requireUser();
+  if (!idSchema.safeParse(workoutId).success) return { ok: false, error: "Workout not found" };
+  const parsed = notesSchema.safeParse(typeof notes === "string" ? notes.trim() : "");
+  if (!parsed.success) return { ok: false, error: "Notes are too long (max 2000 characters)" };
+
+  const { data, error } = await supabase
+    .from("workouts")
+    .update({ notes: parsed.data || null })
+    .eq("id", workoutId)
+    .eq("user_id", userId)
+    .eq("status", "completed")
+    .select("id");
+  if (error) {
+    console.error("updateWorkoutNotes", error);
+    return { ok: false, error: "Couldn't save the note. Please try again." };
+  }
+  if (data.length === 0) return { ok: false, error: "Workout not found" };
+
+  revalidatePath(`/workout/${workoutId}/summary`);
+  return { ok: true, notes: parsed.data };
 }
 
 /**

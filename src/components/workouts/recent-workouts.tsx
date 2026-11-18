@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Dumbbell } from "lucide-react";
-import { toDayKey } from "@/lib/dates";
+import { ChevronRight, Dumbbell } from "lucide-react";
+import { formatMinutes, toDayKey } from "@/lib/dates";
 import { formatVolume, type WeightUnit } from "@/lib/units";
 import type { HubRecent } from "@/lib/workout/hub-queries";
+import { workoutDurationMinutes } from "@/lib/workout/summary";
 
 /**
  * "Mon, 17 Nov" — дата в поясі користувача. Спершу беремо календарний
@@ -15,10 +17,8 @@ function formatDay(iso: string) {
 
 /** "48 min" / "1 h 05 min"; без finished_at — "—". */
 function formatDuration(startedAt: string, finishedAt: string | null) {
-  if (!finishedAt) return "—";
-  const minutes = Math.max(0, Math.round((Date.parse(finishedAt) - Date.parse(startedAt)) / 60_000));
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+  const minutes = workoutDurationMinutes(startedAt, finishedAt);
+  return minutes === null ? "—" : formatMinutes(minutes);
 }
 
 /** Останні завершені тренування (повна історія — Етап 8). */
@@ -53,35 +53,41 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
           const duration = formatDuration(w.startedAt, w.finishedAt);
           return (
             <li key={w.id}>
-              {/* Телефон: два рядки */}
-              <div className="flex items-center gap-3 px-4 py-3.5 md:hidden">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{w.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {date} · {duration}
-                  </p>
+              <Link
+                href={`/workout/${w.id}/summary`}
+                className="block transition-colors hover:bg-white/3 focus-visible:bg-white/4 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none focus-visible:ring-inset active:bg-white/5"
+              >
+                {/* Телефон: два рядки */}
+                <div className="flex items-center gap-3 py-3.5 pr-2.5 pl-4 md:hidden">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{w.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {date} · {duration}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-semibold tabular-nums">
+                      {volume.value}
+                      <span className="ml-0.5 text-xs font-medium text-muted-foreground">{volume.unit}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {w.setsDone} {w.setsDone === 1 ? "set" : "sets"}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-semibold tabular-nums">
+                {/* md+: таблиця */}
+                <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] items-center gap-4 px-5 py-3.5 text-sm md:grid">
+                  <span className="truncate text-[15px] font-semibold">{w.name}</span>
+                  <span className="text-muted-foreground">{date}</span>
+                  <span className="text-muted-foreground tabular-nums">{duration}</span>
+                  <span className="text-right font-semibold tabular-nums">
                     {volume.value}
                     <span className="ml-0.5 text-xs font-medium text-muted-foreground">{volume.unit}</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {w.setsDone} {w.setsDone === 1 ? "set" : "sets"}
-                  </p>
+                  </span>
+                  <span className="text-right tabular-nums">{w.setsDone}</span>
                 </div>
-              </div>
-              {/* md+: таблиця */}
-              <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] items-center gap-4 px-5 py-3.5 text-sm md:grid">
-                <span className="truncate text-[15px] font-semibold">{w.name}</span>
-                <span className="text-muted-foreground">{date}</span>
-                <span className="text-muted-foreground tabular-nums">{duration}</span>
-                <span className="text-right font-semibold tabular-nums">
-                  {volume.value}
-                  <span className="ml-0.5 text-xs font-medium text-muted-foreground">{volume.unit}</span>
-                </span>
-                <span className="text-right tabular-nums">{w.setsDone}</span>
-              </div>
+              </Link>
             </li>
           );
         })}

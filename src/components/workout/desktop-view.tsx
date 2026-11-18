@@ -265,7 +265,7 @@ function StatsCard() {
             <Trophy className="mx-auto mb-1 size-4 text-amber-400" aria-hidden />
             {stats.prs}
           </dd>
-          <dd className="text-xs text-muted-foreground">New PR</dd>
+          <dd className="text-xs text-muted-foreground">New PRs</dd>
         </div>
       </dl>
       <label htmlFor="workout-notes" className="mt-5 block font-semibold">
