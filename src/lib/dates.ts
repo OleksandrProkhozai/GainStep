@@ -44,3 +44,9 @@ export function startOfWeek(key: string) {
   const weekday = parseDayKey(key).getUTCDay(); // 0 = неділя
   return addDays(key, -((weekday + 6) % 7));
 }
+
+/** Тривалість для показу: "52 min" / "1 h 05 min". */
+export function formatMinutes(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+}

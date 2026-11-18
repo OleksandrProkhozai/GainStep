@@ -22,7 +22,7 @@ export default async function WorkoutPage({ params }: PageProps<"/workout/[id]">
   const supabase = await createClient();
   const result = await loadWorkout(supabase, id, user.id);
   if (result.kind === "not-found") notFound();
-  if (result.kind === "completed") redirect("/");
+  if (result.kind === "completed") redirect(`/workout/${id}/summary`);
 
   return <WorkoutScreen init={result.data} />;
 }

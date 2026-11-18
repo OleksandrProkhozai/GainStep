@@ -12,6 +12,7 @@ import {
   type SetResult,
   type Suggestion,
 } from "@/lib/progression";
+import { countPRExercises } from "./records";
 import type { SavedSet, WorkoutExercise, WorkoutSet } from "./types";
 
 export const WEIGHT_MAX_KG = 500;
@@ -210,12 +211,17 @@ export function bestE1RMToday(sets: WorkoutSet[]) {
   );
 }
 
-/** Підсумок для картки "This workout". */
+/**
+ * Підсумок для картки "This workout".
+ * prs — кількість вправ з рекордом (як на підсумку й дашборді).
+ */
 export function workoutStats(exercises: WorkoutExercise[], sets: WorkoutSet[]) {
   return {
     volumeKg: sessionVolume(sets.map(toResult)),
     setsDone: sets.filter((s) => s.isCompleted).length,
-    prs: exercises.reduce((sum, e) => sum + prIds(e, sets).size, 0),
+    prs: countPRExercises(
+      exercises.map((e) => ({ sets: setsOf(sets, e.exerciseId).map(toResult), best: e.best })),
+    ),
   };
 }
 

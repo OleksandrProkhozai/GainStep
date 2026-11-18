@@ -126,7 +126,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
         });
         return;
       }
-      // Стор чистимо до виклику: дія завершується редіректом на /.
+      // Стор чистимо до виклику: дія завершується редіректом на підсумок.
       store.persist.clearStorage();
       const result = await finishWorkout(init.workoutId, store.getState().notes);
       if (result?.error) {

@@ -57,7 +57,7 @@ export default async function DashboardPage() {
           day={data.program ? data.today : null}
           activeWorkout={data.activeWorkout}
         />
-        <ProgressionCard />
+        <ProgressionCard items={data.program ? data.smartProgression : []} unit={data.unit} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
@@ -83,8 +83,8 @@ export default async function DashboardPage() {
         <StatCard
           icon={Trophy}
           iconClassName="text-yellow-400"
-          value="—"
-          label="New PRs · Coming soon"
+          value={String(data.week.prs)}
+          label="New PRs · This week"
         />
       </div>
 

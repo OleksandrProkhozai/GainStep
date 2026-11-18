@@ -1,8 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LayoutGrid, Play, Sparkles, type LucideIcon } from "lucide-react";
+import type { SmartSuggestion } from "@/lib/dashboard/queries";
+import type { Suggestion, SuggestionAction } from "@/lib/progression";
+import { formatWeight, type WeightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 import { startWorkout } from "@/lib/workout/actions";
+import { formatSuggestionReason } from "@/lib/workout/suggestion-text";
 import { StartWorkoutButton } from "./start-workout-button";
 
 const pillClass =
@@ -90,19 +94,105 @@ export function TodayCard({
   );
 }
 
-/** "Smart progression": поки алгоритму немає — порожній стан. */
-export function ProgressionCard() {
+/** Скільки вправ показуємо в "Smart progression": одну великою + до двох у списку. */
+const SMART_SHOWN = 3;
+
+const ACTION_TONE: Record<Exclude<SuggestionAction, "none">, string> = {
+  increase: "bg-primary text-primary-foreground",
+  same: "bg-white/10 text-foreground/85",
+  deload: "bg-orange-400 text-[#1a0f00]",
+};
+
+const ACTION_SIGN: Record<Exclude<SuggestionAction, "none">, { sign: string; className: string; label: string }> = {
+  increase: { sign: "↑", className: "text-primary", label: "increase" },
+  same: { sign: "=", className: "text-muted-foreground", label: "same weight" },
+  deload: { sign: "↓", className: "text-orange-400", label: "deload" },
+};
+
+function SuggestionPill({ suggestion, unit }: { suggestion: Suggestion; unit: WeightUnit }) {
+  if (suggestion.action === "none") return null;
+  const text =
+    suggestion.action === "increase"
+      ? `↑ +${formatWeight(suggestion.delta, unit)}`
+      : suggestion.action === "deload"
+        ? "↓ −10%"
+        : "= same";
   return (
-    <section className="flex flex-col rounded-2xl border border-white/10 bg-card p-5">
-      <h2 className="font-heading text-base font-bold">Smart progression</h2>
-      <div className="mt-3 flex flex-1 items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 md:flex-col md:items-start md:justify-center">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
-          <Sparkles className="size-5" aria-hidden />
-        </span>
-        <p className="text-sm text-muted-foreground">
-          Complete a workout to get weight recommendations
-        </p>
-      </div>
+    <span
+      className={cn(
+        "inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-bold whitespace-nowrap",
+        ACTION_TONE[suggestion.action],
+      )}
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
+ * "Smart progression": рекомендації алгоритму на сьогоднішній день програми.
+ * Перша вправа — великим шрифтом з пігулкою і поясненням, ще до двох —
+ * компактним списком. Порожній стан — якщо для жодної вправи немає історії.
+ */
+export function ProgressionCard({ items, unit }: { items: SmartSuggestion[]; unit: WeightUnit }) {
+  const [first, ...rest] = items;
+  const shown = rest.slice(0, SMART_SHOWN - 1);
+  const more = items.length - 1 - shown.length;
+
+  return (
+    <section
+      aria-labelledby="smart-progression-heading"
+      className="flex min-w-0 flex-col rounded-2xl border border-white/10 bg-card p-5"
+    >
+      <h2 id="smart-progression-heading" className="flex items-center gap-2 font-heading text-base font-bold">
+        <Sparkles className="size-4 text-amber-300" aria-hidden />
+        Smart progression
+      </h2>
+      {!first ? (
+        <div className="mt-3 flex flex-1 items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 md:flex-col md:items-start md:justify-center">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
+            <Sparkles className="size-5" aria-hidden />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            Complete a workout to get weight recommendations
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mt-3">
+            <p className="truncate text-sm text-foreground/85">{first.name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="font-heading text-[28px] leading-none font-extrabold tracking-tight tabular-nums">
+                {formatWeight(first.suggestion.weight ?? 0, unit)}
+              </p>
+              <SuggestionPill suggestion={first.suggestion} unit={unit} />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {formatSuggestionReason(first.suggestion, first, unit)}
+            </p>
+          </div>
+          {shown.length > 0 && (
+            <ul className="mt-3 divide-y divide-white/5 border-t border-white/5">
+              {shown.map((item) => {
+                const sign = ACTION_SIGN[item.suggestion.action as Exclude<SuggestionAction, "none">];
+                return (
+                  <li key={item.exerciseId} className="flex items-center gap-2 py-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">
+                      {formatWeight(item.suggestion.weight ?? 0, unit)}
+                    </span>
+                    <span className={cn("w-3 shrink-0 text-center text-xs font-bold", sign.className)}>
+                      <span aria-hidden>{sign.sign}</span>
+                      <span className="sr-only">{sign.label}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {more > 0 && <p className="mt-1 text-xs text-muted-foreground">+{more} more</p>}
+        </>
+      )}
     </section>
   );
 }

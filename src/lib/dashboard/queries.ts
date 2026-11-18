@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, startOfWeek, toDayKey } from "@/lib/dates";
-import { epley1RM, setVolume } from "@/lib/metrics";
+import { epley1RM, sessionVolume } from "@/lib/metrics";
+import { suggestNextWeight, type Suggestion } from "@/lib/progression";
 import type { WeightUnit } from "@/lib/units";
+import { loadExerciseSessions } from "@/lib/workout/queries";
+import { countPRExercisesInWorkouts, type ExerciseSession } from "@/lib/workout/records";
 import type { Database } from "@/types/database.types";
 
 type Client = SupabaseClient<Database>;
@@ -13,6 +16,15 @@ export type ProgressPoint = {
   oneRmKg: number;
 };
 
+/** Рекомендація алгоритму для вправи сьогоднішнього дня (картка "Smart progression"). */
+export type SmartSuggestion = {
+  exerciseId: string;
+  name: string;
+  repMin: number;
+  repMax: number;
+  suggestion: Suggestion;
+};
+
 export type DashboardData = {
   displayName: string | null;
   unit: WeightUnit;
@@ -20,7 +32,10 @@ export type DashboardData = {
   today: { id: string; name: string } | null;
   /** Незавершене тренування (кнопка "Continue workout"). */
   activeWorkout: { id: string; name: string } | null;
-  week: { volumeKg: number; workouts: number };
+  /** prs — кількість вправ з рекордом у тренуваннях тижня. */
+  week: { volumeKg: number; workouts: number; prs: number };
+  /** Вправи сьогоднішнього дня з рекомендацією (без 'none'), у порядку дня. */
+  smartProgression: SmartSuggestion[];
   streakWeeks: number;
   progress: { exerciseName: string; points: ProgressPoint[] } | null;
 };
@@ -31,10 +46,11 @@ const RECENT_WORKOUTS_LIMIT = 500;
 const PROGRESS_DAYS = 366;
 
 /**
- * Усі дані дашборду. Запити йдуть двома паралельними хвилями
- * (третя — лише якщо в сьогоднішньому дні немає вправ):
+ * Усі дані дашборду, без N+1:
  *  1) профіль з активною програмою, днями й вправами + завершені тренування;
- *  2) підходи поточного тижня + підходи вправи для графіка.
+ *  2) паралельно: графік прогресу і ланцюжок «підходи поточного тижня →
+ *     історія (одним запитом) для вправ тижня та сьогоднішнього дня».
+ *     З історії рахуються рекомендації ("Smart progression") і рекорди тижня.
  */
 export async function getDashboardData(
   supabase: Client,
@@ -49,7 +65,8 @@ export async function getDashboardData(
          program:programs!profiles_active_program_id_fkey (
            id, name,
            program_days ( id, name, position,
-             program_exercises ( position, exercise_id, exercises ( name ) )
+             program_exercises ( position, exercise_id, target_sets, rep_min, rep_max,
+               exercises ( name, weight_increment ) )
            )
          )`,
       )
@@ -96,16 +113,24 @@ export async function getDashboardData(
   }
   const streakWeeks = countWeekStreak(weeksWithWorkouts, currentWeek);
 
-  // --- Вправа для графіка: позиція 0 сьогоднішнього дня
-  const firstExercise = todayDay?.program_exercises
-    .slice()
-    .sort((a, b) => a.position - b.position)[0];
+  // --- Вправи сьогоднішнього дня; для графіка — позиція 0
+  const todayExercises = [...(todayDay?.program_exercises ?? [])].sort(
+    (a, b) => a.position - b.position,
+  );
+  const firstExercise = todayExercises[0];
   const progressSince = new Date(
     now.getTime() - PROGRESS_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  const [weekVolumeKg, progress] = await Promise.all([
-    getVolumeKg(supabase, thisWeekIds),
+  const [weekData, progress] = await Promise.all([
+    getWeekSets(supabase, thisWeekIds).then(async (weekSets) => {
+      const ids = new Set([
+        ...todayExercises.map((pe) => pe.exercise_id),
+        ...weekSets.map((s) => s.exercise_id),
+      ]);
+      const sessions = await loadExerciseSessions(supabase, [...ids]);
+      return { weekSets, sessions };
+    }),
     firstExercise
       ? getProgressPoints(supabase, firstExercise.exercise_id, progressSince).then(
           (points) => ({
@@ -124,7 +149,22 @@ export async function getDashboardData(
     program: program ? { id: program.id, name: program.name } : null,
     today: todayDay ? { id: todayDay.id, name: todayDay.name } : null,
     activeWorkout: activeRes.data,
-    week: { volumeKg: weekVolumeKg, workouts: thisWeekIds.length },
+    week: {
+      volumeKg: sessionVolume(weekData.weekSets),
+      workouts: thisWeekIds.length,
+      prs: countPRExercisesInWorkouts(weekData.sessions.values(), new Set(thisWeekIds)),
+    },
+    smartProgression: buildSmartProgression(
+      todayExercises.map((pe) => ({
+        exerciseId: pe.exercise_id,
+        name: pe.exercises?.name ?? "Exercise",
+        repMin: pe.rep_min,
+        repMax: pe.rep_max,
+        targetSets: pe.target_sets,
+        increment: Number(pe.exercises?.weight_increment ?? 2.5),
+      })),
+      weekData.sessions,
+    ),
     streakWeeks,
     progress,
   };
@@ -163,16 +203,55 @@ export function countWeekStreak(weeks: Set<string>, currentWeek: string) {
   return streak;
 }
 
-/** Тоннаж виконаних підходів у заданих (завершених) тренуваннях, кг. */
-async function getVolumeKg(supabase: Client, workoutIds: string[]) {
-  if (workoutIds.length === 0) return 0;
+/**
+ * Рекомендації алгоритму подвійної прогресії для вправ дня.
+ * Вправи без історії ('none') пропускаються; порядок — як у дні.
+ * @param sessions завершені тренування кожної вправи, від найновішого
+ */
+export function buildSmartProgression(
+  exercises: {
+    exerciseId: string;
+    name: string;
+    repMin: number;
+    repMax: number;
+    targetSets: number;
+    increment: number;
+  }[],
+  sessions: Map<string, ExerciseSession[]>,
+): SmartSuggestion[] {
+  const result: SmartSuggestion[] = [];
+  const seen = new Set<string>();
+  for (const ex of exercises) {
+    if (seen.has(ex.exerciseId)) continue;
+    seen.add(ex.exerciseId);
+    const suggestion = suggestNextWeight({
+      history: sessions.get(ex.exerciseId) ?? [],
+      repMin: ex.repMin,
+      repMax: ex.repMax,
+      targetSets: ex.targetSets,
+      increment: ex.increment,
+    });
+    if (suggestion.action === "none") continue;
+    result.push({ exerciseId: ex.exerciseId, name: ex.name, repMin: ex.repMin, repMax: ex.repMax, suggestion });
+  }
+  return result;
+}
+
+/** Виконані підходи заданих (завершених) тренувань — для тоннажу і списку вправ тижня. */
+async function getWeekSets(supabase: Client, workoutIds: string[]) {
+  if (workoutIds.length === 0) return [];
   const { data, error } = await supabase
     .from("workout_sets")
-    .select("weight, reps")
+    .select("exercise_id, weight, reps")
     .in("workout_id", workoutIds)
     .eq("is_completed", true);
   if (error) throw error;
-  return data.reduce((sum, s) => sum + setVolume(s.weight, s.reps), 0);
+  return data.map((s) => ({
+    exercise_id: s.exercise_id,
+    weight: Number(s.weight),
+    reps: s.reps,
+    isCompleted: true,
+  }));
 }
 
 /** Найкраща оцінка 1ПМ вправи за кожне завершене тренування, від старих до нових. */
