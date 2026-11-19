@@ -1,4 +1,5 @@
-import { z } from "zod";
+import { z } from "@/lib/validations/zod-codes";
+import { fromDisplayWeight } from "@/lib/units";
 import type { Enums } from "@/types/database.types";
 
 export const WEIGHT_LIMITS = {
@@ -6,7 +7,6 @@ export const WEIGHT_LIMITS = {
   lb: { min: 66, max: 660 },
 } as const satisfies Record<Enums<"weight_unit">, { min: number; max: number }>;
 
-export const KG_PER_LB = 0.45359237;
 
 const unit = z.enum(["kg", "lb"]);
 
@@ -14,9 +14,9 @@ const unit = z.enum(["kg", "lb"]);
 const weight = z
   .string()
   .trim()
-  .min(1, { error: "Enter your body weight" })
+  .min(1, { error: "weightRequired" })
   .regex(/^\d{1,3}([.,]\d)?$/, {
-    error: "Use a number with at most one decimal place",
+    error: "weightOneDecimal",
   })
   .transform((value) => Number(value.replace(",", ".")));
 
@@ -30,7 +30,8 @@ function refineWeightRange(
     ctx.addIssue({
       code: "custom",
       path: ["weight"],
-      message: `Enter a weight between ${min} and ${max} ${data.unit}`,
+      // Межі клієнт бере з WEIGHT_LIMITS[unit] (errors.weightRange).
+      message: "weightRange",
     });
   }
 }
@@ -58,6 +59,6 @@ export type OnboardingInput = z.input<typeof onboardingSchema>;
 
 /** Перевести вагу в кг і округлити до 0.01. */
 export function toKg(value: number, unitValue: Enums<"weight_unit">) {
-  const kg = unitValue === "lb" ? value * KG_PER_LB : value;
+  const kg = fromDisplayWeight(value, unitValue);
   return Math.round(kg * 100) / 100;
 }

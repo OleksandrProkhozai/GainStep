@@ -2,30 +2,26 @@
 
 import { useState } from "react";
 import {
-  Cable,
   Check,
   CloudCheck,
   CloudOff,
-  Cog,
-  Dumbbell,
   Loader2,
   Minus,
-  PersonStanding,
   Plus,
   Timer,
   Trophy,
-  Weight,
-  type LucideIcon,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { useWeightFormat } from "@/components/i18n/use-format";
 import { cn } from "@/lib/utils";
 import type { Suggestion } from "@/lib/progression";
 import { clampReps, clampWeightKg, REPS_MAX, WEIGHT_MAX_KG } from "@/lib/workout/derive";
-import { formatSuggestionReason } from "@/lib/workout/suggestion-text";
+import { suggestionReason } from "@/lib/workout/suggestion-text";
 import type { Equipment, MuscleGroup, WorkoutExercise } from "@/lib/workout/types";
 import {
-  formatWeight,
   formatWeightValue,
   fromDisplayWeight,
+  unitLabel,
   kgToUnit,
   toInputWeight,
   weightStep,
@@ -35,31 +31,19 @@ import type { SetResult } from "@/lib/progression";
 import { useWorkout } from "./context";
 import { formatElapsed, useNow } from "./hooks";
 
-// ───────────── Іконки й теги ─────────────
-
-const EQUIPMENT_ICON: Record<Equipment, { icon: LucideIcon; className?: string }> = {
-  barbell: { icon: Dumbbell },
-  dumbbell: { icon: Dumbbell, className: "-rotate-45" },
-  machine: { icon: Cog },
-  cable: { icon: Cable },
-  bodyweight: { icon: PersonStanding },
-  kettlebell: { icon: Weight },
-};
-
-export function ExerciseIcon({ equipment, className }: { equipment: Equipment; className?: string }) {
-  const { icon: Icon, className: rotate } = EQUIPMENT_ICON[equipment];
-  return <Icon className={cn("size-6 shrink-0 text-foreground/85", rotate, className)} aria-hidden />;
-}
-
-const label = (value: MuscleGroup | Equipment) => value.charAt(0).toUpperCase() + value.slice(1);
+// ───────────── Теги ─────────────
 
 export function ExerciseTags({ exercise, className }: { exercise: WorkoutExercise; className?: string }) {
+  const tm = useTranslations("common.enums.muscle");
+  const tq = useTranslations("common.enums.equipment");
+  const label = (value: MuscleGroup | Equipment) =>
+    value === exercise.muscleGroup ? tm(value as MuscleGroup) : tq(value as Equipment);
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
       {[exercise.muscleGroup, exercise.equipment].map((tag) => (
         <span
           key={tag}
-          className="rounded-full border border-white/15 px-3.5 py-1 text-sm font-medium text-foreground/90"
+          className="rounded-full border border-foreground/15 px-3.5 py-1 text-sm font-medium text-foreground/90"
         >
           {label(tag)}
         </span>
@@ -77,38 +61,39 @@ export function ExerciseTags({ exercise, className }: { exercise: WorkoutExercis
 export function SuggestionBanner({
   exercise,
   suggestion,
-  unit,
   className,
 }: {
   exercise: WorkoutExercise;
   suggestion: Suggestion;
-  unit: WeightUnit;
   className?: string;
 }) {
-  const weight = suggestion.weight === null ? null : formatWeight(suggestion.weight, unit);
+  const t = useTranslations("workout.suggestion");
+  const tr = useTranslations("common.suggestion.reason");
+  const fmt = useWeightFormat();
+  const weight = suggestion.weight === null ? "" : fmt.weight(suggestion.weight);
+  const r = suggestionReason(suggestion, exercise);
   let text: string;
   let tone: string;
   switch (suggestion.action) {
     case "increase":
-      text = `Suggested: ${weight} ↑ +${formatWeight(suggestion.delta, unit)}`;
+      text = t("increase", { weight, delta: fmt.weight(suggestion.delta) });
       tone = "bg-primary text-primary-foreground";
       break;
     case "deload":
-      text = `Suggested: ${weight} ↓ −10%`;
+      text = t("deload", { weight });
       tone = "bg-orange-400 text-[#1a0f00]";
       break;
     case "same":
-      text = `Suggested: ${weight} = same`;
-      tone = "bg-white/10 text-foreground";
+      text = t("same", { weight });
+      tone = "bg-foreground/10 text-foreground";
       break;
     default:
-      text = formatSuggestionReason(suggestion, exercise, unit);
-      tone = "bg-white/10 text-foreground";
+      text = tr(r.key, r.values);
+      tone = "bg-foreground/10 text-foreground";
   }
 
   // Для 'none' пояснення вже на самій плашці.
-  const reason =
-    suggestion.action === "none" ? null : formatSuggestionReason(suggestion, exercise, unit);
+  const reason = suggestion.action === "none" ? null : tr(r.key, r.values);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -128,22 +113,24 @@ export function SuggestionBanner({
 // ───────────── Шапка: годинник і статус збереження ─────────────
 
 export function WorkoutClock({ startedAt, className }: { startedAt: number; className?: string }) {
+  const t = useTranslations("workout");
   const now = useNow(1000);
   return (
     <span className={cn("inline-flex items-center gap-2 font-heading font-extrabold tabular-nums", className)}>
       <Timer className="size-[0.9em] shrink-0" strokeWidth={2.25} aria-hidden />
       <span>{formatElapsed(now - startedAt)}</span>
-      <span className="sr-only">workout duration</span>
+      <span className="sr-only">{t("duration")}</span>
     </span>
   );
 }
 
 export function SaveStatus({ className }: { className?: string }) {
+  const t = useTranslations("workout.sync");
   const status = useWorkout((s) => s.syncStatus);
   const config = {
-    saved: { icon: CloudCheck, text: "Saved", cls: "text-muted-foreground" },
-    saving: { icon: Loader2, text: "Saving…", cls: "text-muted-foreground" },
-    offline: { icon: CloudOff, text: "Offline · will sync", cls: "text-orange-300" },
+    saved: { icon: CloudCheck, text: t("saved"), cls: "text-muted-foreground" },
+    saving: { icon: Loader2, text: t("saving"), cls: "text-muted-foreground" },
+    offline: { icon: CloudOff, text: t("offline"), cls: "text-orange-300" },
   }[status];
   const Icon = config.icon;
   return (
@@ -161,6 +148,7 @@ export function SaveStatus({ className }: { className?: string }) {
 // ───────────── Підходи ─────────────
 
 export function PrBadge({ className }: { className?: string }) {
+  const t = useTranslations("common");
   return (
     <span
       className={cn(
@@ -169,15 +157,15 @@ export function PrBadge({ className }: { className?: string }) {
       )}
     >
       <Trophy className="size-3" aria-hidden />
-      PR
+      {t("pr")}
     </span>
   );
 }
 
-/** "60 × 12" або "—". */
-export function formatSetResult(set: SetResult | null, unit: WeightUnit) {
+/** "60 × 12" (uk: "62,5 × 12") або "—". */
+export function formatSetResult(set: SetResult | null, unit: WeightUnit, locale = "en") {
   if (!set) return "—";
-  return `${formatWeightValue(set.weight, unit)} × ${set.reps}`;
+  return `${formatWeightValue(set.weight, unit, locale)} × ${set.reps}`;
 }
 
 /** Кругла галочка "Done". */
@@ -202,7 +190,7 @@ export function DoneButton({
         "flex size-9 shrink-0 items-center justify-center rounded-full transition focus-visible:ring-3 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
         done
           ? "bg-primary text-primary-foreground hover:bg-primary/90"
-          : "border-2 border-white/35 text-transparent hover:border-primary/70",
+          : "border-2 border-foreground/35 text-transparent hover:border-primary/70",
         className,
       )}
     >
@@ -219,7 +207,7 @@ export function ProgressDots({ done, total }: { done: number; total: number }) {
       {Array.from({ length: shown }, (_, i) => (
         <span
           key={i}
-          className={cn("size-1.5 rounded-full", i < done ? "bg-primary" : "bg-white/30")}
+          className={cn("size-1.5 rounded-full", i < done ? "bg-primary" : "bg-foreground/30")}
         />
       ))}
     </span>
@@ -252,6 +240,7 @@ function Stepper({
   size: "sm" | "lg";
   label: string;
 }) {
+  const t = useTranslations("workout");
   const [draft, setDraft] = useState<string | null>(null);
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const nudge = (dir: 1 | -1) => {
@@ -265,16 +254,16 @@ function Stepper({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center rounded-xl bg-black/35 ring-1 ring-white/5",
+        "flex min-w-0 items-center rounded-full bg-background/70 ring-1 ring-foreground/5",
         lg ? "h-14 w-full" : "h-10",
       )}
     >
       <button
         type="button"
         onClick={() => nudge(-1)}
-        aria-label={`Decrease ${label}`}
+        aria-label={t("decrease", { label })}
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-xl text-foreground/90 transition hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
+          "flex shrink-0 items-center justify-center rounded-full text-foreground/90 transition hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
           lg ? "size-12" : "size-8 xl:size-9",
         )}
       >
@@ -300,16 +289,16 @@ function Stepper({
           if (e.key === "Enter") e.currentTarget.blur();
         }}
         className={cn(
-          "h-full min-w-0 flex-1 bg-transparent text-center font-bold tabular-nums outline-none placeholder:text-muted-foreground focus:bg-white/5",
+          "h-full min-w-0 flex-1 bg-transparent text-center font-bold tabular-nums outline-none placeholder:text-muted-foreground focus:bg-foreground/5",
           lg ? "text-2xl" : "w-11 text-base xl:w-14",
         )}
       />
       <button
         type="button"
         onClick={() => nudge(1)}
-        aria-label={`Increase ${label}`}
+        aria-label={t("increase", { label })}
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-xl text-foreground/90 transition hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
+          "flex shrink-0 items-center justify-center rounded-full text-foreground/90 transition hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
           lg ? "size-12" : "size-8 xl:size-9",
         )}
       >
@@ -333,6 +322,8 @@ export function WeightStepper({
   onChange: (kg: number) => void;
   size?: "sm" | "lg";
 }) {
+  const t = useTranslations("workout");
+  const locale = useLocale();
   return (
     <Stepper
       value={weightKg === null ? null : toInputWeight(weightKg, unit)}
@@ -341,7 +332,7 @@ export function WeightStepper({
       max={Math.floor(kgToUnit(WEIGHT_MAX_KG, unit))}
       onChange={(v) => onChange(clampWeightKg(fromDisplayWeight(v, unit)))}
       size={size}
-      label={`weight, ${unit}`}
+      label={t("weightLabel", { unit: unitLabel(unit, locale) })}
     />
   );
 }
@@ -355,6 +346,7 @@ export function RepsStepper({
   onChange: (reps: number) => void;
   size?: "sm" | "lg";
 }) {
+  const t = useTranslations("workout");
   return (
     <Stepper
       value={reps}
@@ -364,7 +356,7 @@ export function RepsStepper({
       integer
       onChange={(v) => onChange(clampReps(v))}
       size={size}
-      label="reps"
+      label={t("repsLabel")}
     />
   );
 }

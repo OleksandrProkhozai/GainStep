@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
+import { exerciseName } from "@/lib/i18n/names";
 import { useStore } from "zustand";
+import { useUnit } from "@/components/preferences/preferences-provider";
 import { createClient } from "@/lib/supabase/client";
 import { discardWorkout, finishWorkout } from "@/lib/workout/actions";
 import { firstPending } from "@/lib/workout/derive";
@@ -45,6 +49,12 @@ export function WorkoutScreen({ init }: { init: WorkoutInit }) {
 }
 
 function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
+  // Одиниці — з налаштувань (не зі store): зміна unit одразу міняє показ,
+  // а store і далі тримає кг.
+  const unit = useUnit();
+  const t = useTranslations("workout");
+  const locale = useLocale();
+  const errorText = useErrorText();
   const isDesktop = useIsDesktop();
   const [syncer] = useState(() => createSyncer(store, createClient()));
   const [dialog, setDialog] = useState<null | "finish" | "discard" | "add" | "note">(null);
@@ -90,11 +100,11 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       if (late > REST_ALERT_WINDOW_MS) return;
       playRestOverSound();
       if ("vibrate" in navigator) navigator.vibrate?.([200, 100, 200]);
-      toast("Rest is over", { description: "Time for the next set 💪" });
+      toast(t("toast.restOver"), { description: t("toast.restOverText") });
     };
     const id = setTimeout(fire, Math.max(0, restEndsAt - Date.now()));
     return () => clearTimeout(id);
-  }, [restEndsAt, store]);
+  }, [restEndsAt, store, t]);
 
   // ── Дії екрана
   const completeSet = useCallback(
@@ -102,7 +112,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       primeAudio(); // звук дозволений лише після дії користувача
       const set = store.getState().sets.find((s) => s.clientId === clientId);
       if (set?.weightKg === null) {
-        toast.error("Enter the weight first");
+        toast.error(t("toast.enterWeight"));
         return;
       }
       const exercise = store.getState().complete(clientId, Date.now());
@@ -111,18 +121,22 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       if (!firstPending(store.getState().sets, exercise.exerciseId)) {
         const { exercises, currentIndex } = store.getState();
         const next = exercises[currentIndex + 1];
-        if (next) toast.success(`${exercise.name} done`, { description: `Next up: ${next.name}` });
+        if (next) {
+          toast.success(t("toast.exerciseDone", { name: exerciseName(exercise, locale) }), {
+            description: t("toast.nextUp", { name: exerciseName(next, locale) }),
+          });
+        }
       }
     },
-    [store],
+    [store, t, locale],
   );
 
   const finish = useCallback(() => {
     startFinishing(async () => {
       const synced = await syncer.flush();
       if (!synced) {
-        toast.error("Some sets aren't synced yet", {
-          description: "Check your connection and try again.",
+        toast.error(t("toast.notSynced"), {
+          description: t("toast.notSyncedText"),
         });
         return;
       }
@@ -132,10 +146,10 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       if (result?.error) {
         // Повертаємо стан у localStorage — тренування триває.
         store.setState({});
-        toast.error(result.error);
+        toast.error(errorText(result.error));
       }
     });
-  }, [store, syncer, init.workoutId]);
+  }, [store, syncer, init.workoutId, t, errorText]);
 
   const discard = useCallback(() => {
     startFinishing(async () => {
@@ -144,10 +158,10 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       const result = await discardWorkout(init.workoutId);
       if (result?.error) {
         store.setState({});
-        toast.error(result.error);
+        toast.error(errorText(result.error));
       }
     });
-  }, [store, syncer, init.workoutId]);
+  }, [store, syncer, init.workoutId, errorText]);
 
   const requestFinish = useCallback(() => {
     const open = store.getState().sets.filter((s) => !s.isCompleted).length;
@@ -161,7 +175,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       name: init.name,
       programName: init.programName,
       startedAt: new Date(init.startedAt).getTime(),
-      unit: init.unit,
+      unit,
       completeSet,
       requestFinish,
       requestDiscard: () => setDialog("discard"),
@@ -173,7 +187,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       openExercises: () => setSheetOpen(true),
       finishing,
     }),
-    [init, completeSet, requestFinish, finishing],
+    [init, unit, completeSet, requestFinish, finishing],
   );
 
   // ── Гарячі клавіші (не в полях вводу й не у відкритих діалогах)
@@ -229,18 +243,18 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       <ConfirmDialog
         open={dialog === "finish"}
         onOpenChange={(o) => setDialog(o ? "finish" : null)}
-        title="Finish workout?"
-        description={`${openSets} ${openSets === 1 ? "set is" : "sets are"} not completed and won't be saved.`}
-        confirmLabel="Finish workout"
+        title={t("finishDialog.title")}
+        description={t("finishDialog.text", { count: openSets })}
+        confirmLabel={t("finish")}
         pending={finishing}
         onConfirm={finish}
       />
       <ConfirmDialog
         open={dialog === "discard"}
         onOpenChange={(o) => setDialog(o ? "discard" : null)}
-        title="Discard workout?"
-        description="The workout and all its sets will be deleted. This can't be undone."
-        confirmLabel="Discard"
+        title={t("discardDialog.title")}
+        description={t("discardDialog.text")}
+        confirmLabel={t("discardDialog.confirm")}
         destructive
         pending={finishing}
         onConfirm={discard}

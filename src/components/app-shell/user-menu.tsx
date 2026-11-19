@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { Loader2, LogOut } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,19 +24,20 @@ export function UserMenu({
   name: string;
   email: string | null;
 }) {
+  const t = useTranslations("common");
   const [pending, startTransition] = useTransition();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Account menu"
+        aria-label={t("accountMenu")}
         className="rounded-full focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
       >
         <Avatar initials={initials} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="dark w-56 rounded-xl border border-white/10 p-1.5"
+        className="w-56 rounded-xl border border-foreground/10 p-1.5"
       >
         <DropdownMenuLabel className="px-2 py-1.5">
           <p className="truncate text-sm font-semibold text-foreground">{name}</p>
@@ -55,7 +57,7 @@ export function UserMenu({
           className="gap-2 px-2 py-2"
         >
           {pending ? <Loader2 className="animate-spin" /> : <LogOut />}
-          Sign out
+          {t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

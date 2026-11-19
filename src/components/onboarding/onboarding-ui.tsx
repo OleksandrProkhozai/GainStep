@@ -1,4 +1,5 @@
 import { Check, Dumbbell, type LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { signOut } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 
@@ -28,9 +29,10 @@ export function OnboardingShell({
   completed: number;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("common");
   return (
-    <main className="dark flex min-h-dvh flex-1 flex-col overflow-x-clip bg-background text-foreground md:items-center md:justify-center md:px-6 md:py-10 lg:py-6">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:mx-0 md:min-h-[600px] md:max-w-[880px] md:flex-none md:rounded-3xl md:border md:border-white/10 md:bg-card md:px-10 md:py-9 md:shadow-2xl md:shadow-black/40 lg:min-h-0 lg:max-w-[1100px] lg:py-7">
+    <main className="flex min-h-dvh flex-1 flex-col overflow-x-clip bg-background text-foreground md:items-center md:justify-center md:px-6 md:py-10 lg:py-6">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:mx-0 md:min-h-[600px] md:max-w-[880px] md:flex-none md:rounded-3xl md:border md:border-foreground/10 md:bg-card md:px-10 md:py-9 md:shadow-2xl md:shadow-black/40 lg:min-h-0 lg:max-w-[1100px] lg:py-7">
         <header className="grid grid-cols-[1fr_auto_1fr] items-center gap-y-6 md:gap-x-6 md:gap-y-0">
           <Logo className="col-start-2 row-start-1 justify-self-center md:col-start-1 md:justify-self-start" />
           <form
@@ -41,7 +43,7 @@ export function OnboardingShell({
               type="submit"
               className="rounded-full px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
-              Sign out
+              {t("signOut")}
             </button>
           </form>
           <Stepper
@@ -64,19 +66,19 @@ function Logo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <Dumbbell
-        className="size-7 rotate-45 text-primary md:size-8"
+        className="size-7 rotate-45 text-accent-text md:size-8"
         strokeWidth={2.5}
         aria-hidden
       />
       <span className="font-heading text-2xl leading-none font-extrabold tracking-tight md:text-[28px]">
         <span className="text-foreground">Gain</span>
-        <span className="text-primary">Step</span>
+        <span className="text-accent-text">Step</span>
       </span>
     </div>
   );
 }
 
-const STEP_NAMES = ["Body weight", "Level", "Program"];
+const STEP_KEYS = ["bodyWeight", "level", "program"] as const;
 
 /**
  * Степер 1—2—3: пройдений — лайм з галочкою, майбутній — темний.
@@ -93,32 +95,35 @@ export function Stepper({
   variant?: "steps" | "progress";
   className?: string;
 }) {
+  const t = useTranslations("onboarding.stepper");
   const progress = variant === "progress";
-  const completed = Math.min(current - 1, STEP_NAMES.length);
+  const total = STEP_KEYS.length;
+  const completed = Math.min(current - 1, total);
 
   return (
     <div className={cn("flex items-center", className)}>
       {progress && (
         <span className="sr-only" aria-live="polite">
-          {`${completed} of ${STEP_NAMES.length} sections completed`}
+          {t("completed", { completed, total })}
         </span>
       )}
       <ol
-        aria-label="Onboarding progress"
+        aria-label={t("label")}
         aria-hidden={progress || undefined}
         className="flex items-center"
       >
-        {STEP_NAMES.map((name, index) => {
+        {STEP_KEYS.map((key, index) => {
+          const name = t(`steps.${key}`);
           const n = index + 1;
           const done = n < current;
           const active = n === current;
           return (
-            <li key={name} className="flex items-center">
+            <li key={key} className="flex items-center">
               {n > 1 && (
                 // Трек + лаймова заливка, що плавно «наїжджає» зліва направо.
                 <span
                   aria-hidden
-                  className="relative h-0.5 w-9 overflow-hidden rounded-full bg-white/15 min-[380px]:w-12 md:w-20 lg:w-24"
+                  className="relative h-0.5 w-9 overflow-hidden rounded-full bg-foreground/15 min-[380px]:w-12 md:w-20 lg:w-24"
                 >
                   <span
                     className={cn(
@@ -135,11 +140,11 @@ export function Stepper({
                   done && "bg-primary text-primary-foreground",
                   active &&
                     (progress
-                      ? "border-2 border-primary bg-secondary text-primary"
+                      ? "border-2 border-primary bg-secondary text-accent-text"
                       : "bg-primary text-primary-foreground ring-4 ring-primary/20"),
                   !done &&
                     !active &&
-                    "border border-white/10 bg-secondary text-muted-foreground",
+                    "border border-foreground/10 bg-secondary text-muted-foreground",
                 )}
               >
                 {done ? (
@@ -149,7 +154,7 @@ export function Stepper({
                 )}
                 {!progress && (
                   <span className="sr-only">
-                    {`Step ${n} of ${STEP_NAMES.length}: ${name}${done ? ", completed" : ""}`}
+                    {t(done ? "stepDone" : "step", { n, total, name })}
                   </span>
                 )}
               </span>
@@ -242,7 +247,7 @@ export function SegmentedControl<T extends string>({
       {...aria}
       onKeyDown={handleRadioKeys}
       className={cn(
-        "grid h-14 auto-cols-fr grid-flow-col gap-1 rounded-full border border-white/10 bg-secondary/60 p-1",
+        "grid h-14 auto-cols-fr grid-flow-col gap-1 rounded-full border border-foreground/10 bg-secondary/60 p-1",
         className,
       )}
     >
@@ -276,7 +281,7 @@ const choiceBase =
 const choiceState = (selected: boolean) =>
   selected
     ? "border-primary bg-primary/[0.06]"
-    : "border-white/10 bg-secondary/40 hover:border-white/25";
+    : "border-foreground/10 bg-secondary/40 hover:border-foreground/25";
 
 /** Велика картка вибору (рівень підготовки) з галочкою в правому верхньому куті. */
 export function LevelCard({
@@ -332,6 +337,7 @@ function CornerCheck() {
 /** Компактна вертикальна картка програми (десктоп): іконка зверху, галочка в куті. */
 export function ProgramTile({
   icon: Icon,
+  media,
   title,
   description,
   selected,
@@ -339,6 +345,8 @@ export function ProgramTile({
   onSelect,
 }: {
   icon: LucideIcon;
+  /** Картинка замість іконки (мініатюра шаблону програми). */
+  media?: React.ReactNode;
   title: string;
   description: string;
   selected: boolean;
@@ -359,10 +367,12 @@ export function ProgramTile({
       )}
     >
       {selected && <CornerCheck />}
-      <Icon
-        className={cn("size-7", selected ? "text-primary" : "text-foreground")}
-        aria-hidden
-      />
+      {media ?? (
+        <Icon
+          className={cn("size-7", selected ? "text-accent-text" : "text-foreground")}
+          aria-hidden
+        />
+      )}
       <span className="mt-2 max-w-full truncate text-base font-bold text-foreground">
         {title}
       </span>
@@ -374,6 +384,7 @@ export function ProgramTile({
 /** Горизонтальна картка програми з радіо-колом праворуч. */
 export function ProgramCard({
   icon: Icon,
+  media,
   title,
   description,
   selected,
@@ -381,6 +392,8 @@ export function ProgramCard({
   onSelect,
 }: {
   icon: LucideIcon;
+  /** Картинка замість іконки (мініатюра шаблону програми). */
+  media?: React.ReactNode;
   title: string;
   description: string;
   selected: boolean;
@@ -400,14 +413,16 @@ export function ProgramCard({
         "flex min-h-[76px] w-full items-center gap-4 px-4 py-3",
       )}
     >
-      <span
-        className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-2xl transition-colors",
-          selected ? "bg-primary/15 text-primary" : "bg-white/5 text-foreground",
-        )}
-      >
-        <Icon className="size-6" aria-hidden />
-      </span>
+      {media ?? (
+        <span
+          className={cn(
+            "flex size-12 shrink-0 items-center justify-center rounded-2xl transition-colors",
+            selected ? "bg-primary/15 text-accent-text" : "bg-foreground/5 text-foreground",
+          )}
+        >
+          <Icon className="size-6" aria-hidden />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-base font-semibold text-foreground">
           {title}
@@ -420,7 +435,7 @@ export function ProgramCard({
           "flex size-7 shrink-0 items-center justify-center rounded-full transition-colors",
           selected
             ? "bg-primary text-primary-foreground"
-            : "border-2 border-white/25",
+            : "border-2 border-foreground/25",
         )}
       >
         {selected && <Check className="size-4" strokeWidth={3} />}

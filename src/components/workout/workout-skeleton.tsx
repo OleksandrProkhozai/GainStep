@@ -1,10 +1,11 @@
+import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Заглушка екрана тренування (завантаження даних і стану з localStorage). */
 export function WorkoutSkeleton() {
   return (
-    <div className="flex min-h-dvh flex-col" aria-busy="true" aria-label="Loading workout">
-      <div className="flex items-center justify-between gap-4 border-b border-white/5 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 lg:px-6 lg:py-5">
+    <div className="flex min-h-dvh flex-col" aria-busy="true" aria-label={useTranslations("common.loading")("workout")}>
+      <div className="flex items-center justify-between gap-4 border-b border-foreground/5 px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 lg:px-6 lg:py-5">
         <Skeleton className="size-9 rounded-full" />
         <Skeleton className="h-8 w-40 lg:h-11 lg:w-48" />
         <Skeleton className="size-9 rounded-full lg:h-11 lg:w-40" />

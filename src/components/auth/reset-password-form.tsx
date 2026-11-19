@@ -3,7 +3,9 @@
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
 import { updatePassword } from "@/lib/auth/actions";
 import {
   resetPasswordSchema,
@@ -14,6 +16,8 @@ import { PasswordInput } from "./form-fields";
 import { SubmitButton } from "./submit-button";
 
 export function ResetPasswordForm() {
+  const t = useTranslations("auth");
+  const errorText = useErrorText();
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -27,31 +31,31 @@ export function ResetPasswordForm() {
   const onSubmit = handleSubmit((values) =>
     startTransition(async () => {
       const result = await updatePassword(values);
-      if (result && "error" in result) toast.error(result.error);
+      if (result && "error" in result) toast.error(errorText(result.error));
     }),
   );
 
   return (
     <>
       <AuthHeader
-        title="Set new"
-        accent="password"
-        subtitle="Choose a password with at least 8 characters"
+        title={t("reset.title")}
+        accent={t("reset.accent")}
+        subtitle={t("reset.subtitle")}
       />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <PasswordInput
-          label="New password"
+          label={t("newPassword")}
           autoComplete="new-password"
-          error={errors.password?.message}
+          error={errorText(errors.password?.message)}
           {...register("password")}
         />
         <PasswordInput
-          label="Confirm password"
+          label={t("confirmPassword")}
           autoComplete="new-password"
-          error={errors.confirmPassword?.message}
+          error={errorText(errors.confirmPassword?.message)}
           {...register("confirmPassword")}
         />
-        <SubmitButton pending={pending}>Update password</SubmitButton>
+        <SubmitButton pending={pending}>{t("reset.submit")}</SubmitButton>
       </form>
     </>
   );

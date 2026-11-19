@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { historyBest, type PersonalBest, type Session } from "@/lib/progression";
 import type { Database } from "@/types/database.types";
+import { getTemplateNames, templateName } from "@/lib/programs/template-names";
+import { groupSessionRows } from "./history";
 import type { ExerciseSession } from "./records";
 import {
   ADDED_EXERCISE_DEFAULTS,
@@ -39,8 +41,7 @@ export async function loadExerciseSessions(
   exerciseIds: string[],
   cutoff?: HistoryCutoff,
 ): Promise<Map<string, ExerciseSession[]>> {
-  const result = new Map<string, ExerciseSession[]>();
-  if (exerciseIds.length === 0) return result;
+  if (exerciseIds.length === 0) return new Map();
 
   let query = supabase
     .from("workout_sets")
@@ -59,38 +60,17 @@ export async function loadExerciseSessions(
     .limit(HISTORY_ROWS_LIMIT);
   if (error) throw error;
 
-  // вправа → тренування → підходи
-  const grouped = new Map<
-    string,
-    Map<string, { startedAt: string; sets: { n: number; set: Session["sets"][number] }[] }>
-  >();
-  for (const row of data) {
-    let byWorkout = grouped.get(row.exercise_id);
-    if (!byWorkout) grouped.set(row.exercise_id, (byWorkout = new Map()));
-    let session = byWorkout.get(row.workout_id);
-    if (!session) {
-      session = { startedAt: row.workouts.started_at, sets: [] };
-      byWorkout.set(row.workout_id, session);
-    }
-    session.sets.push({
-      n: row.set_number,
-      set: { weight: Number(row.weight), reps: row.reps, isCompleted: row.is_completed },
-    });
-  }
-
-  for (const [exerciseId, byWorkout] of grouped) {
-    result.set(
-      exerciseId,
-      [...byWorkout.entries()]
-        .sort(([, a], [, b]) => b.startedAt.localeCompare(a.startedAt))
-        .map(([workoutId, s]) => ({
-          workoutId,
-          startedAt: s.startedAt,
-          sets: s.sets.sort((a, b) => a.n - b.n).map((x) => x.set),
-        })),
-    );
-  }
-  return result;
+  return groupSessionRows(
+    data.map((row) => ({
+      exerciseId: row.exercise_id,
+      workoutId: row.workout_id,
+      startedAt: row.workouts.started_at,
+      setNumber: row.set_number,
+      weight: Number(row.weight),
+      reps: row.reps,
+      isCompleted: row.is_completed,
+    })),
+  );
 }
 
 /** Тренування вправ → два останні (від найновішого) + найкращі показники за всю історію. */
@@ -120,6 +100,7 @@ export async function loadExerciseHistory(
 type ExerciseRow = {
   id: string;
   name: string;
+  name_uk: string | null;
   muscle_group: MuscleGroup;
   equipment: Equipment;
   weight_increment: number;
@@ -134,6 +115,7 @@ export function toWorkoutExercise(
   return {
     exerciseId: exercise.id,
     name: exercise.name,
+    nameUk: exercise.name_uk,
     muscleGroup: exercise.muscle_group,
     equipment: exercise.equipment,
     increment: Number(exercise.weight_increment),
@@ -143,7 +125,7 @@ export function toWorkoutExercise(
   };
 }
 
-const EXERCISE_COLUMNS = "id, name, muscle_group, equipment, weight_increment";
+const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment";
 
 export type LoadWorkoutResult =
   | { kind: "ok"; data: WorkoutInit }
@@ -152,16 +134,20 @@ export type LoadWorkoutResult =
 
 /**
  * Дані екрана активного тренування. Дві хвилі запитів:
- *  1) тренування з днем програми та його вправами, профіль (одиниці),
- *     уже збережені підходи цього тренування;
+ *  1) тренування з днем програми та його вправами, уже збережені
+ *     підходи цього тренування (одиниці — з useUnit() на клієнті);
  *  2) історія завершених тренувань для всіх вправ — одним запитом.
  */
 export async function loadWorkout(
   supabase: Client,
   workoutId: string,
   userId: string,
+  /** Відпочинок для вправ, доданих під час тренування (профіль користувача). */
+  defaultRestSeconds: number = ADDED_EXERCISE_DEFAULTS.restSeconds,
+  /** Мова стандартних назв шаблонів (назва тренування, програми). */
+  locale = "en",
 ): Promise<LoadWorkoutResult> {
-  const [workoutRes, profileRes, setsRes] = await Promise.all([
+  const [workoutRes, setsRes, templateNames] = await Promise.all([
     supabase
       .from("workouts")
       .select(
@@ -176,7 +162,6 @@ export async function loadWorkout(
       .eq("id", workoutId)
       .eq("user_id", userId)
       .maybeSingle(),
-    supabase.from("profiles").select("unit").eq("id", userId).maybeSingle(),
     supabase
       .from("workout_sets")
       .select(
@@ -186,14 +171,15 @@ export async function loadWorkout(
       .eq("workout_id", workoutId)
       .order("exercise_position")
       .order("set_number"),
+    getTemplateNames(supabase),
   ]);
   if (workoutRes.error) throw workoutRes.error;
-  if (profileRes.error) throw profileRes.error;
   if (setsRes.error) throw setsRes.error;
 
   const workout = workoutRes.data;
   if (!workout) return { kind: "not-found" };
   if (workout.status === "completed") return { kind: "completed" };
+  const programName = workout.program_day?.program?.name;
 
   // Вправи дня (за position) + вправи, додані під час тренування (з workout_sets).
   // Одна вправа — один раз: ключ workout_sets містить exercise_id.
@@ -218,7 +204,7 @@ export async function loadWorkout(
   for (const s of setsRes.data) {
     if (!s.exercise || seen.has(s.exercise.id)) continue;
     seen.add(s.exercise.id);
-    ordered.push({ exercise: s.exercise, params: { ...ADDED_EXERCISE_DEFAULTS } });
+    ordered.push({ exercise: s.exercise, params: { ...ADDED_EXERCISE_DEFAULTS, restSeconds: defaultRestSeconds } });
   }
 
   const history = await loadExerciseHistory(supabase, [...seen]);
@@ -236,11 +222,10 @@ export async function loadWorkout(
     kind: "ok",
     data: {
       workoutId: workout.id,
-      name: workout.name,
-      programName: workout.program_day?.program?.name ?? null,
+      name: templateName(workout.name, templateNames, locale),
+      programName: programName ? templateName(programName, templateNames, locale) : null,
       startedAt: workout.started_at,
       notes: workout.notes ?? "",
-      unit: profileRes.data?.unit ?? "kg",
       exercises: ordered.map((o) =>
         toWorkoutExercise(o.exercise, o.params, history.get(o.exercise.id)),
       ),

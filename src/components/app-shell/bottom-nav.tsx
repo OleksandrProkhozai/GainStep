@@ -2,29 +2,35 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, isNavActive } from "./nav-items";
 
 /** Нижня панель навігації на телефоні (<md), з урахуванням safe-area. */
 export function BottomNav() {
-  const pathname = usePathname();
+  return <BottomNavView pathname={usePathname()} />;
+}
+
+/** pathname = null — без підсвічування (fallback у Suspense). */
+export function BottomNavView({ pathname }: { pathname: string | null }) {
+  const t = useTranslations("nav");
 
   return (
     <nav
-      aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#121316]/95 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] backdrop-blur-xl md:hidden"
+      aria-label={t("main")}
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-foreground/10 bg-sidebar/95 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] backdrop-blur-xl md:hidden"
     >
       <ul className="grid grid-cols-5">
-        {NAV_ITEMS.map(({ href, shortLabel, icon: Icon }) => {
-          const active = isNavActive(pathname, href);
+        {NAV_ITEMS.map(({ href, key, icon: Icon }) => {
+          const active = pathname !== null && isNavActive(pathname, href);
           return (
             <li key={href}>
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors focus-visible:bg-white/5 focus-visible:outline-none",
-                  active ? "text-primary" : "text-muted-foreground",
+                  "flex h-16 flex-col items-center justify-center gap-1 px-0.5 text-[11px] leading-none font-medium tracking-tight whitespace-nowrap transition-colors focus-visible:bg-foreground/5 focus-visible:outline-none",
+                  active ? "text-accent-text" : "text-muted-foreground",
                 )}
               >
                 <span
@@ -35,7 +41,7 @@ export function BottomNav() {
                 >
                   <Icon className="size-5" aria-hidden />
                 </span>
-                {shortLabel}
+                {t(`short.${key}`)}
               </Link>
             </li>
           );

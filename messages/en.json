@@ -1,0 +1,782 @@
+{
+  "common": {
+    "meta": {
+      "description": "Track every lift. Progress automatically."
+    },
+    "athlete": "Athlete",
+    "signOut": "Sign out",
+    "accountMenu": "Account menu",
+    "cancel": "Cancel",
+    "save": "Save",
+    "discard": "Discard",
+    "pr": "PR",
+    "comingSoon": {
+      "title": "Coming soon",
+      "text": "This section is under construction."
+    },
+    "loading": {
+      "programs": "Loading programs",
+      "exercises": "Loading exercises",
+      "workout": "Loading workout",
+      "summary": "Loading workout summary",
+      "page": "Loading"
+    },
+    "suggestion": {
+      "reason": {
+        "increase": "All sets reached {repMax} reps",
+        "same": "Reach {repMax} reps on all sets first",
+        "deload": "Below {repMin} reps two sessions in a row",
+        "none": "No history yet — pick a starting weight"
+      }
+    },
+    "enums": {
+      "muscle": {
+        "chest": "Chest",
+        "back": "Back",
+        "shoulders": "Shoulders",
+        "biceps": "Biceps",
+        "triceps": "Triceps",
+        "quads": "Quads",
+        "hamstrings": "Hamstrings",
+        "glutes": "Glutes",
+        "calves": "Calves",
+        "core": "Core"
+      },
+      "equipment": {
+        "barbell": "Barbell",
+        "dumbbell": "Dumbbell",
+        "machine": "Machine",
+        "cable": "Cable",
+        "bodyweight": "Bodyweight",
+        "kettlebell": "Kettlebell"
+      },
+      "experience": {
+        "beginner": "Beginner",
+        "intermediate": "Intermediate"
+      },
+      "goal": {
+        "strength": "Strength",
+        "hypertrophy": "Muscle"
+      },
+      "unit": {
+        "kg": "kg",
+        "lb": "lb"
+      }
+    }
+  },
+  "nav": {
+    "main": "Main",
+    "homeLink": "GainStep — dashboard",
+    "items": {
+      "dashboard": "Dashboard",
+      "workouts": "Workouts",
+      "progress": "Progress",
+      "programs": "Programs",
+      "settings": "Settings"
+    },
+    "short": {
+      "dashboard": "Home",
+      "workouts": "Workouts",
+      "progress": "Progress",
+      "programs": "Programs",
+      "settings": "Settings"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "invalidValue": "Check this value",
+    "invalidForm": "Please check the form fields",
+    "tooSmall": "The value is too small",
+    "tooBig": "The value is too large",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordMin": "Password must be at least 8 characters",
+    "passwordMax": "Password must be at most 72 characters",
+    "passwordsMismatch": "Passwords do not match",
+    "invalidCredentials": "Invalid email or password",
+    "emailNotConfirmed": "Confirm your email first — check your inbox",
+    "userExists": "An account with this email already exists",
+    "weakPassword": "This password is too weak — choose a stronger one",
+    "samePassword": "The new password must be different from the old one",
+    "rateLimited": "Too many attempts. Please wait a bit and try again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "authFailed": "Authentication failed. Please try again.",
+    "weightRequired": "Enter your weight",
+    "weightOneDecimal": "Use at most one decimal place",
+    "weightRange": "Enter a weight between {min} and {max} {unit}",
+    "weightNotNumber": "Enter a number, e.g. 73.4",
+    "dateInvalid": "Pick a valid date",
+    "dateFuture": "You can’t log weight for a future date",
+    "bodyWeightSaveFailed": "Couldn’t save your weight. Please try again.",
+    "entryNotFound": "Entry not found",
+    "entryDeleteFailed": "Couldn’t delete the entry. Please try again.",
+    "profileLoadFailed": "Couldn’t load your profile. Please try again.",
+    "preferencesSaveFailed": "Couldn’t save your preferences. Please try again.",
+    "finishFailed": "Couldn’t finish setup. Please try again.",
+    "programSetupFailed": "Couldn’t set up your program. Please try again.",
+    "programUnavailable": "This program is no longer available.",
+    "exerciseNameMin": "Name must be at least 2 characters",
+    "exerciseNameMax": "Name must be at most 80 characters",
+    "weightStepRequired": "Enter a weight step",
+    "weightStepPositive": "Weight step must be greater than 0",
+    "weightStepUnrealistic": "Enter a realistic weight step",
+    "exerciseExists": "You already have an exercise with this name",
+    "exerciseSaveFailed": "Couldn’t save the exercise. Please try again.",
+    "exerciseNotFound": "Exercise not found",
+    "exerciseInUse": "This exercise is used in a program or in your workout history, so it can’t be deleted.",
+    "exerciseDeleteFailed": "Couldn’t delete the exercise. Please try again.",
+    "programNameMin": "Name must be at least 2 characters",
+    "programNameMax": "Name must be at most 60 characters",
+    "dayNameRequired": "Day name is required",
+    "dayNameMax": "Day name must be at most 30 characters",
+    "setsRange": "Sets must be between 1 and 10",
+    "repsRange": "Reps must be between 1 and 100",
+    "restRange": "Rest must be between 0:00 and 10:00",
+    "restStep": "Rest must be a multiple of 15 seconds",
+    "repsOrder": "Min reps can’t be greater than max reps",
+    "dayNeedsExercise": "“{day}” needs at least one exercise",
+    "dayDuplicateExercise": "An exercise is repeated in “{day}”",
+    "programNeedsDay": "A program needs at least one day",
+    "programMaxDays": "A program can have at most 7 days",
+    "programCreateFailed": "Couldn’t create the program. Please try again.",
+    "programNotFound": "Program not found",
+    "saveNotSetUp": "Saving isn’t set up yet — run the save_program migration.",
+    "programInvalid": "Please check the program",
+    "programSaveFailed": "Couldn’t save the program. Please try again.",
+    "activeProgramFailed": "Couldn’t update the active program.",
+    "programDuplicateFailed": "Couldn’t duplicate the program.",
+    "programDeleteFailed": "Couldn’t delete the program.",
+    "workoutNotFound": "Workout not found",
+    "notesTooLong": "Notes are too long (max 2000 characters)",
+    "workoutFinishFailed": "Couldn’t finish the workout. Please try again.",
+    "noteSaveFailed": "Couldn’t save the note. Please try again.",
+    "workoutDiscardFailed": "Couldn’t discard the workout. Please try again.",
+    "nameRequired": "Enter your name",
+    "nameMax": "Name must be at most 60 characters",
+    "nothingToUpdate": "Nothing to update",
+    "settingsNotSetUp": "Settings aren’t set up yet — run the settings migration in Supabase.",
+    "settingsSaveFailed": "Couldn’t save your settings. Please try again.",
+    "applyRestFailed": "Couldn’t update your programs. Please try again.",
+    "accountDeleteFailed": "Couldn’t delete your account. Please try again."
+  },
+  "auth": {
+    "meta": {
+      "signIn": "Sign in",
+      "forgot": "Forgot password",
+      "reset": "Reset password"
+    },
+    "hero": {
+      "line1": "Track every lift.",
+      "line2": "Progress automatically."
+    },
+    "signIn": {
+      "title": "Welcome",
+      "accent": "back!",
+      "subtitle": "Sign in to continue",
+      "submit": "Sign in",
+      "link": "Sign in"
+    },
+    "signUp": {
+      "title": "Create",
+      "accent": "account",
+      "subtitle": "Start tracking your progress",
+      "submit": "Sign up",
+      "link": "Sign up"
+    },
+    "forgot": {
+      "title": "Forgot",
+      "accent": "password?",
+      "subtitle": "Enter your email and we'll send you a reset link",
+      "submit": "Send reset link",
+      "sentTitle": "Check your",
+      "sentAccent": "email",
+      "sent": "We sent a password reset link to <email></email>."
+    },
+    "reset": {
+      "title": "Set new",
+      "accent": "password",
+      "subtitle": "Choose a password with at least 8 characters",
+      "submit": "Update password"
+    },
+    "email": "Email address",
+    "password": "Password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "forgotLink": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "or": "or",
+    "google": "Continue with Google",
+    "backToSignIn": "Back to sign in",
+    "callbackFailed": "Authentication failed. Please try again.",
+    "messages": {
+      "checkEmail": "Check your email to confirm your account",
+      "checkEmailReset": "Check your email"
+    }
+  },
+  "onboarding": {
+    "metaTitle": "Get started",
+    "step1": {
+      "title": "Tell us about you",
+      "subtitle": "We'll use it to track your progress."
+    },
+    "step2": {
+      "title": "What's your level?",
+      "subtitle": "Help us set up the best experience for you."
+    },
+    "step3": {
+      "title": "Choose a starter program.",
+      "titleDesktop": "Choose a starter program:"
+    },
+    "bodyWeight": "Body weight",
+    "weightUnit": "Weight unit",
+    "unitSystem": "Unit system?",
+    "experience": "Training experience",
+    "focus": "Training focus?",
+    "starterProgram": "Starter program",
+    "daysPerWeek": "{count, plural, one {# day/week} other {# days/week}}",
+    "custom": {
+      "title": "Custom",
+      "description": "I'll set it up later"
+    },
+    "levels": {
+      "beginner": "Up to 1 year of training",
+      "intermediate": "1+ years of training"
+    },
+    "back": "Back",
+    "next": "Next",
+    "letsGo": "Let's go",
+    "completeAll": "Complete all sections to continue",
+    "stepper": {
+      "label": "Onboarding progress",
+      "completed": "{completed} of {total} sections completed",
+      "step": "Step {n} of {total}: {name}",
+      "stepDone": "Step {n} of {total}: {name}, completed",
+      "steps": {
+        "bodyWeight": "Body weight",
+        "level": "Level",
+        "program": "Program"
+      }
+    }
+  },
+  "dashboard": {
+    "metaTitle": "Dashboard",
+    "athlete": "athlete",
+    "greeting": "Hi, <accent>{name}</accent>",
+    "startWorkout": "Start workout",
+    "today": {
+      "inProgress": "In progress",
+      "resumeText": "Pick up where you left off.",
+      "continue": "Continue workout",
+      "nextUp": "Next up",
+      "todayDay": "Today: {name}",
+      "motivation": "Let’s crush your workout!",
+      "noProgram": "No program yet",
+      "noProgramText": "Pick a training program to get your daily workout plan.",
+      "chooseProgram": "Choose a program"
+    },
+    "progression": {
+      "title": "Smart progression",
+      "empty": "Complete a workout to get weight recommendations",
+      "same": "same",
+      "more": "+{count} more",
+      "action": {
+        "increase": "increase",
+        "same": "keep weight",
+        "deload": "deload"
+      }
+    },
+    "stats": {
+      "volume": "Weekly volume",
+      "workouts": "Workouts this week",
+      "streak": "Week streak",
+      "prs": "New PRs · This week"
+    },
+    "chart": {
+      "title": "Your progress",
+      "subtitle": "Estimated 1RM, {unit}",
+      "range": "Time range",
+      "ranges": {
+        "1M": "1M",
+        "3M": "3M",
+        "1Y": "1Y"
+      },
+      "empty": "Your progress will appear after the first workout",
+      "emptyPeriod": "No workouts with this exercise in this period",
+      "e1rm": "Estimated 1RM"
+    }
+  },
+  "workout": {
+    "metaTitle": "Workout",
+    "duration": "workout duration",
+    "back": "Back to dashboard",
+    "exercises": "Exercises",
+    "shortcuts": "<kbd>Enter</kbd> — complete set · <kbd>Space</kbd> — pause timer · <kbd>← →</kbd> — switch exercise",
+    "finish": "Finish workout",
+    "finishShort": "Finish",
+    "exerciseOf": "Exercise {n} of {total}",
+    "nOfTotal": "{n} of {total}",
+    "sets": "Sets",
+    "col": {
+      "set": "Set",
+      "previous": "Previous",
+      "weight": "Weight",
+      "reps": "Reps",
+      "done": "Done"
+    },
+    "setN": "Set {n}",
+    "editSetN": "Set {n}, edit",
+    "markNotDoneN": "Mark set {n} as not done",
+    "completeSetN": "Complete set {n}",
+    "deleteSetN": "Delete set {n}",
+    "previousValue": "Previous: {value}",
+    "weightWithUnit": "Weight ({unit})",
+    "weightLabel": "weight, {unit}",
+    "repsLabel": "reps",
+    "decrease": "Decrease {label}",
+    "increase": "Increase {label}",
+    "addSet": "Add set",
+    "addExercise": "Add exercise",
+    "addNote": "Add note",
+    "discard": "Discard workout",
+    "options": "Workout options",
+    "e1rmToday": "Est. 1RM today:",
+    "previous": "Previous",
+    "nextExercise": "Next exercise",
+    "nextNamed": "Next: {name}",
+    "markNotDone": "Mark not done",
+    "done": "Done",
+    "completeSet": "Complete set",
+    "allSetsDone": "All sets done 💪",
+    "sheetDescription": "Switch exercise or finish the workout",
+    "setsProgress": "{done}/{total} sets",
+    "thisWorkout": "This workout",
+    "volume": "Volume",
+    "setsDone": "Sets done",
+    "newPrs": "New PRs",
+    "notes": "Notes",
+    "notesLabel": "Workout notes",
+    "notesHint": "Saved with the workout when you finish it.",
+    "notesPlaceholder": "How did it feel?",
+    "suggestion": {
+      "increase": "Suggested: {weight} ↑ +{delta}",
+      "deload": "Suggested: {weight} ↓ −10%",
+      "same": "Suggested: {weight} = same"
+    },
+    "sync": {
+      "saved": "Saved",
+      "saving": "Saving…",
+      "offline": "Offline · will sync"
+    },
+    "rest": {
+      "title": "Rest timer",
+      "paused": "Paused",
+      "restTime": "Rest time",
+      "idle": "Starts when you complete a set",
+      "pause": "Pause rest timer",
+      "resume": "Resume rest timer",
+      "skip": "Skip",
+      "allDone": "All sets done",
+      "next": "Next: Set {n} · {weight} × {reps}"
+    },
+    "toast": {
+      "restOver": "Rest is over",
+      "restOverText": "Time for the next set 💪",
+      "enterWeight": "Enter the weight first",
+      "exerciseDone": "{name} done",
+      "nextUp": "Next up: {name}",
+      "notSynced": "Some sets aren’t synced yet",
+      "notSyncedText": "Check your connection and try again."
+    },
+    "finishDialog": {
+      "title": "Finish workout?",
+      "text": "{count, plural, one {# set is not completed and won’t be saved.} other {# sets are not completed and won’t be saved.}}"
+    },
+    "discardDialog": {
+      "title": "Discard workout?",
+      "text": "The workout and all its sets will be deleted. This can’t be undone.",
+      "confirm": "Discard"
+    },
+    "addDialog": {
+      "title": "Add exercise",
+      "defaults": "{sets} sets × {repMin}–{repMax} reps, rest {rest}",
+      "search": "Search exercises",
+      "loading": "Loading",
+      "empty": "No exercises found",
+      "loadFailed": "Couldn’t load exercises",
+      "addFailed": "Couldn’t add the exercise. Check your connection."
+    }
+  },
+  "summary": {
+    "metaTitle": "Workout summary",
+    "close": "Close summary",
+    "done": "Done",
+    "viewHistory": "View history",
+    "hero": {
+      "record": "{name} — {weight} × {reps} · est. 1RM {e1rm}",
+      "volumeVsLast": "Volume {change} vs last {day}",
+      "firstDay": "First {day} — great start!",
+      "setsDone": "{count, plural, one {# set done — nice work!} other {# sets done — nice work!}}",
+      "newPrs": "{count, plural, one {New PR!} other {# new PRs!}}",
+      "complete": "Workout complete!",
+      "more": "+{count} more"
+    },
+    "stats": {
+      "duration": "Duration",
+      "volume": "Volume",
+      "sets": "Sets",
+      "prs": "PRs",
+      "vsLast": "vs last {day}"
+    },
+    "exercises": {
+      "title": "Exercises",
+      "empty": "No completed sets in this workout.",
+      "e1rm": "Est. 1RM"
+    },
+    "next": {
+      "title": "Next time",
+      "subtitle": "Calculated by double progression",
+      "empty": "Complete some sets to get suggestions.",
+      "deload": "deload −10%",
+      "same": "same"
+    },
+    "nextUp": {
+      "title": "Next up",
+      "viewProgram": "View program"
+    },
+    "notes": {
+      "title": "Notes",
+      "edit": "Edit note",
+      "label": "Workout note",
+      "placeholder": "How did it feel?",
+      "add": "Add a note",
+      "saved": "Note saved"
+    }
+  },
+  "workouts": {
+    "title": "Workouts",
+    "newWorkout": "New workout",
+    "subtitle": "Start a session or pick up where you left off.",
+    "start": "Start a workout",
+    "startShort": "Start",
+    "blocked": "Finish or discard the current workout first",
+    "upNext": "Up next",
+    "exerciseCount": "{count, plural, one {# exercise} other {# exercises}}",
+    "more": "+{count} more",
+    "noProgram": {
+      "title": "No program yet",
+      "text": "Pick a training program to get your workout days.",
+      "cta": "Choose a program"
+    },
+    "recent": "Recent workouts",
+    "recentList": {
+      "empty": "No workouts yet — start your first one above",
+      "workout": "Workout",
+      "date": "Date",
+      "duration": "Duration",
+      "volume": "Volume",
+      "sets": "Sets",
+      "setsCount": "{count, plural, one {# set} other {# sets}}"
+    },
+    "banner": {
+      "inProgress": "Workout in progress",
+      "startedJustNow": "Started just now",
+      "startedMinutes": "Started {minutes} min ago",
+      "startedHours": "Started {hours}h {minutes}m ago",
+      "discard": "Discard",
+      "resume": "Resume",
+      "discardText": "“{name}” and all its sets will be deleted. This can’t be undone."
+    }
+  },
+  "progress": {
+    "title": "Progress",
+    "range": "Time range",
+    "ranges": {
+      "1M": "1M",
+      "3M": "3M",
+      "6M": "6M",
+      "1Y": "1Y",
+      "All": "All"
+    },
+    "exercisePicker": "Exercise: {name}. Change exercise",
+    "stats": {
+      "workingWeight": "Working weight",
+      "e1rm": "Est. 1RM",
+      "bestSet": "Best set",
+      "sessions": "Sessions"
+    },
+    "noLifts": {
+      "title": "No lifts logged yet",
+      "text": "Finish a workout and your working weights, estimated 1RM and records will show up here.",
+      "cta": "Start a workout"
+    },
+    "chart": {
+      "metric": "Chart metric",
+      "metrics": {
+        "weight": "Weight",
+        "e1rm": "Est. 1RM"
+      },
+      "empty": "No sessions with this exercise in this period",
+      "workingWeight": "Working weight",
+      "e1rm": "Estimated 1RM",
+      "bestSet": "Best set {weight} × {reps}",
+      "increased": "Weight increased",
+      "deload": "Deload"
+    },
+    "records": {
+      "title": "Personal records",
+      "empty": "Your best sets will appear here after the first workout.",
+      "e1rm": "Estimated 1RM",
+      "new": "NEW"
+    },
+    "volume": {
+      "title": "Weekly volume",
+      "vsLastWeek": "vs last week",
+      "series": "Volume",
+      "weekOf": "Week of {date}"
+    },
+    "bodyWeight": {
+      "title": "Body weight",
+      "history": "History",
+      "log": "Log weight",
+      "vs": "vs {date}",
+      "empty": "Log your weight on different days to see the trend"
+    },
+    "logWeight": {
+      "title": "Log body weight",
+      "description": "One entry per day. Weigh yourself at the same time of day for a cleaner trend.",
+      "date": "Date",
+      "today": "Today · {date}",
+      "yesterday": "Yesterday · {date}",
+      "weight": "Weight",
+      "existing": "You already logged {weight} on {date} — it will be updated",
+      "rangeHint": "{min}–{max} {unit}, one decimal place",
+      "update": "Update",
+      "logged": "Weight logged",
+      "updated": "Weight updated: {from} → {to} {unit}"
+    },
+    "history": {
+      "title": "Weight history",
+      "description": "One entry per day, newest first.",
+      "empty": "No entries yet",
+      "deleted": "Entry deleted",
+      "confirm": "Delete <b>{weight}</b> on {date}?",
+      "edit": "Edit",
+      "delete": "Delete",
+      "editLabel": "Edit {weight} on {date}",
+      "deleteLabel": "Delete {weight} on {date}"
+    }
+  },
+  "programs": {
+    "title": "Programs",
+    "program": "Program",
+    "dayN": "Day {n}",
+    "copyName": "{name} (copy)",
+    "emptyEditor": {
+      "title": "Choose a program or start from a template",
+      "text": "Pick one of your programs on the left, copy a template, or create a new program."
+    },
+    "editor": {
+      "back": "Back to programs",
+      "readOnly": "Read-only template",
+      "active": "Active",
+      "template": "Template",
+      "meta": "{days, plural, one {# day} other {# days}} · {exercises, plural, one {# exercise} other {# exercises}}",
+      "rename": "Rename",
+      "useTemplate": "Use template",
+      "templateHint": "Templates are read-only — make a copy to edit it.",
+      "days": "Program days",
+      "untitled": "Untitled",
+      "dayWord": "Day",
+      "addDay": "Add day",
+      "daySummary": "{exercises, plural, one {# exercise} other {# exercises}} · {sets, plural, one {# set} other {# sets}} · ~{minutes} min",
+      "dayActions": "Actions for {name}",
+      "renameDay": "Rename day",
+      "deleteDay": "Delete day",
+      "dayExercises": "{name} exercises",
+      "emptyDay": "Add at least one exercise to this day.",
+      "addExercise": "Add exercise",
+      "startDay": "Start {name} day",
+      "saveFirst": "Save changes first",
+      "addExercisesFirst": "Add exercises first",
+      "unsaved": "Unsaved changes",
+      "saved": "Program saved",
+      "renameProgram": {
+        "title": "Rename program",
+        "description": "The new name is saved together with your other changes.",
+        "label": "Name"
+      },
+      "renameDayDialog": {
+        "title": "Rename day",
+        "description": "For example Push, Upper or Day A.",
+        "label": "Day name"
+      }
+    },
+    "next": {
+      "label": "Next {weight} {arrow}",
+      "full": "Next time: {weight}",
+      "none": "No history yet",
+      "bodyweight": "Bodyweight",
+      "caption": {
+        "increase": "Increase weight",
+        "same": "Keep weight",
+        "deload": "Deload −10%"
+      }
+    },
+    "row": {
+      "rest": "Rest {time}",
+      "reorder": "Reorder {name}",
+      "sets": "Sets",
+      "restLabel": "Rest",
+      "minReps": "Min reps",
+      "maxReps": "Max reps",
+      "weightStep": "Weight step",
+      "remove": "Remove",
+      "decrease": "Decrease {label}",
+      "increase": "Increase {label}"
+    },
+    "list": {
+      "active": "Active",
+      "meta": "{days, plural, one {# day} other {# days}} · {exercises, plural, one {# exercise} other {# exercises}}",
+      "activeProgram": "Active program",
+      "days": "Days",
+      "open": "Open",
+      "mine": "My programs",
+      "emptyMine": "No programs yet — start from a template or create your own.",
+      "templates": "Templates",
+      "readOnly": "Read-only",
+      "useTemplate": "Use template",
+      "useTemplateNamed": "Use template {name}"
+    },
+    "menu": {
+      "label": "Program actions",
+      "setActive": "Set as active",
+      "activated": "Program is now active",
+      "rename": "Rename",
+      "duplicate": "Duplicate",
+      "duplicatingSaved": "Duplicating the last saved version",
+      "delete": "Delete",
+      "deleteConfirm": "Delete program",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteText": "The program and its days will be deleted. Your workout history stays.",
+      "deleteActiveWarning": "This is your active program — you won’t have one until you pick a new program, and the dashboard will ask you to choose."
+    },
+    "newProgram": {
+      "new": "New program",
+      "newDescription": "It starts with one day — add exercises and more days in the editor.",
+      "name": "Name",
+      "create": "Create"
+    },
+    "unsavedGuard": {
+      "title": "Discard unsaved changes?",
+      "text": "You have changes in this program that haven’t been saved. They will be lost if you leave.",
+      "keep": "Keep editing",
+      "leave": "Discard & leave"
+    },
+    "switch": {
+      "label": "Programs section",
+      "programs": "Programs",
+      "exercises": "Exercises"
+    }
+  },
+  "exercises": {
+    "title": "Exercises",
+    "count": "{total, plural, one {# exercise} other {# exercises}} · {custom} custom",
+    "create": "Create exercise",
+    "createNamed": "Create “{name}”",
+    "custom": "Custom",
+    "listLabel": "Exercises",
+    "actionsFor": "Actions for {name}",
+    "edit": "Edit",
+    "delete": "Delete",
+    "empty": {
+      "title": "No exercises found",
+      "text": "Try another search or filter."
+    },
+    "filters": {
+      "search": "Search exercises",
+      "clearSearch": "Clear search",
+      "muscleGroup": "Muscle group",
+      "equipment": "Equipment",
+      "all": "All",
+      "muscle": {
+        "chest": "Chest",
+        "back": "Back",
+        "legs": "Legs",
+        "shoulders": "Shoulders",
+        "arms": "Arms",
+        "core": "Core"
+      }
+    },
+    "deleteDialog": {
+      "title": "Delete “{name}”?",
+      "text": "The exercise will be removed from your library. Exercises used in a program or in your workout history can’t be deleted.",
+      "confirm": "Delete",
+      "deleted": "Exercise deleted"
+    },
+    "picker": {
+      "title": "Add exercises",
+      "description": "Pick one or more exercises for this day.",
+      "added": "Added",
+      "noMatch": "No exercises match your search.",
+      "createCustom": "Create custom exercise",
+      "addNone": "Add exercises",
+      "addCount": "{count, plural, one {Add # exercise} other {Add # exercises}}"
+    },
+    "form": {
+      "createTitle": "Create exercise",
+      "editTitle": "Edit exercise",
+      "createDescription": "Add your own exercise to the library.",
+      "editDescription": "Update your custom exercise.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Landmine Press",
+      "muscleGroup": "Muscle group",
+      "equipment": "Equipment",
+      "weightStep": "Weight step",
+      "weightStepHint": "How much weight to add when you progress.",
+      "create": "Create",
+      "created": "Exercise created",
+      "updated": "Exercise updated"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "profile": {
+      "title": "Profile",
+      "name": "Name",
+      "namePlaceholder": "Your name",
+      "noEmail": "No email",
+      "experience": "Experience",
+      "goal": "Goal"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Language",
+      "units": "Units",
+      "rest": "Default rest timer",
+      "restHint": "Used for new exercises",
+      "restDecrease": "Decrease rest by 15 seconds",
+      "restIncrease": "Increase rest by 15 seconds",
+      "restSet": "Default rest set to {time}",
+      "restSetText": "New exercises will use it. Existing programs keep their rest.",
+      "applyAll": "Apply to all my programs",
+      "applied": "{count, plural, one {Updated # exercise} other {Updated # exercises}}"
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email"
+    },
+    "deleteAccount": {
+      "link": "Delete account",
+      "title": "Delete account?",
+      "text": "This permanently deletes your account, programs and workout history.",
+      "confirmLabel": "Type <b>{word}</b> to confirm",
+      "confirm": "Delete account",
+      "deleted": "Account deleted"
+    }
+  }
+}

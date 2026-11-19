@@ -11,6 +11,8 @@ import { cleanFloat, epley1RM, setVolume } from "@/lib/metrics";
 export interface ProgressSet {
   exerciseId: string;
   exerciseName: string;
+  /** Група м'язів вправи (для мініатюри). */
+  muscleGroup?: string;
   workoutId: string;
   /** Початок тренування, ISO. */
   startedAt: string;
@@ -37,6 +39,8 @@ export interface ExerciseSession {
 export interface ExerciseHistory {
   id: string;
   name: string;
+  /** Група м'язів — для мініатюри в селекторі вправи. */
+  muscleGroup?: string;
   /** Від найстарішого до найновішого. */
   sessions: ExerciseSession[];
 }
@@ -65,14 +69,14 @@ export interface WeekVolume {
 export function buildExerciseHistories(sets: readonly ProgressSet[]): ExerciseHistory[] {
   const byExercise = new Map<
     string,
-    { name: string; workouts: Map<string, { t: number; sets: ProgressSet[] }> }
+    { name: string; muscleGroup?: string; workouts: Map<string, { t: number; sets: ProgressSet[] }> }
   >();
 
   for (const s of sets) {
     if (!(s.weight > 0) || !(s.reps > 0)) continue;
     let exercise = byExercise.get(s.exerciseId);
     if (!exercise) {
-      exercise = { name: s.exerciseName, workouts: new Map() };
+      exercise = { name: s.exerciseName, muscleGroup: s.muscleGroup, workouts: new Map() };
       byExercise.set(s.exerciseId, exercise);
     }
     let workout = exercise.workouts.get(s.workoutId);
@@ -109,7 +113,7 @@ export function buildExerciseHistories(sets: readonly ProgressSet[]): ExerciseHi
         change: diff > 0 ? "increase" : diff < 0 ? "deload" : null,
       });
     }
-    histories.push({ id, name: exercise.name, sessions });
+    histories.push({ id, name: exercise.name, muscleGroup: exercise.muscleGroup, sessions });
   }
 
   return histories.sort(

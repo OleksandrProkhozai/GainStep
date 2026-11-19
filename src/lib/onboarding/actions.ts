@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getRequestLocale } from "@/i18n/locale";
 import { createClient } from "@/lib/supabase/server";
 import {
   onboardingSchema,
@@ -8,7 +9,20 @@ import {
   type OnboardingInput,
 } from "@/lib/validations/onboarding";
 
-export type OnboardingResult = { error: string };
+/** Коди помилок (errors.*) — текст підставляє клієнт. */
+export type OnboardingResult = {
+  error:
+    | "invalidForm"
+    | "weightRange"
+    | "weightRequired"
+    | "weightOneDecimal"
+    | "profileLoadFailed"
+    | "bodyWeightSaveFailed"
+    | "preferencesSaveFailed"
+    | "finishFailed"
+    | "programSetupFailed"
+    | "programUnavailable";
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,9 +52,14 @@ export async function completeOnboarding(
 
   const parsed = onboardingSchema.safeParse(values);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Please check your answers" };
+    const code = parsed.error.issues[0]?.message;
+    return {
+      error: code === "weightRange" || code === "weightRequired" || code === "weightOneDecimal" ? code : "invalidForm",
+    };
   }
   const { weight, unit, experience, goal, templateId, today } = parsed.data;
+  // Мова, якою користувач проходить онбординг, стає мовою профілю.
+  const locale = await getRequestLocale();
 
   // 1. Уже пройдено — нічого не перезаписуємо.
   const { data: profile, error: profileError } = await supabase
@@ -50,7 +69,7 @@ export async function completeOnboarding(
     .maybeSingle();
   if (profileError || !profile) {
     console.error("onboarding: load profile", profileError);
-    return { error: "Couldn't load your profile. Please try again." };
+    return { error: "profileLoadFailed" };
   }
   if (profile.onboarded_at) redirect("/");
 
@@ -67,17 +86,17 @@ export async function completeOnboarding(
     );
   if (weightError) {
     console.error("onboarding: body weight", weightError);
-    return { error: "Couldn't save your body weight. Please try again." };
+    return { error: "bodyWeightSaveFailed" };
   }
 
   // 3. Рівень, ціль, одиниці.
   const { error: prefsError } = await supabase
     .from("profiles")
-    .update({ experience, goal, unit })
+    .update({ experience, goal, unit, locale })
     .eq("id", userId);
   if (prefsError) {
     console.error("onboarding: preferences", prefsError);
-    return { error: "Couldn't save your preferences. Please try again." };
+    return { error: "preferencesSaveFailed" };
   }
 
   // 4. Програма з шаблону (для Custom — без програми).
@@ -98,7 +117,7 @@ export async function completeOnboarding(
     .eq("id", userId);
   if (finishError) {
     console.error("onboarding: finish", finishError);
-    return { error: "Couldn't finish setup. Please try again." };
+    return { error: "finishFailed" };
   }
 
   redirect("/");
@@ -122,7 +141,7 @@ async function getOrCloneProgram(
     .maybeSingle();
   if (existingError) {
     console.error("onboarding: find program", existingError);
-    return { error: "Couldn't set up your program. Please try again." };
+    return { error: "programSetupFailed" };
   }
   if (existing) return { id: existing.id };
 
@@ -135,16 +154,17 @@ async function getOrCloneProgram(
     .maybeSingle();
   if (templateError || !template) {
     console.error("onboarding: template", templateError);
-    return { error: "This program is no longer available." };
+    return { error: "programUnavailable" };
   }
 
   const { data: newId, error: cloneError } = await supabase.rpc(
     "clone_program",
-    { template_id: templateId },
+    // Назви шаблону й днів — мовою інтерфейсу (name_uk для uk).
+    { template_id: templateId, p_locale: await getRequestLocale() },
   );
   if (cloneError || !newId) {
     console.error("onboarding: clone program", cloneError);
-    return { error: "Couldn't set up your program. Please try again." };
+    return { error: "programSetupFailed" };
   }
   return { id: newId };
 }

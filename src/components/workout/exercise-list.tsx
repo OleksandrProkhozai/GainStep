@@ -1,13 +1,18 @@
 "use client";
 
 import { Check, Plus } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { exerciseName } from "@/lib/i18n/names";
 import { cn } from "@/lib/utils";
 import { useScreen, useWorkout } from "./context";
-import { ExerciseIcon, ProgressDots } from "./parts";
+import { ProgressDots } from "./parts";
 import { useExerciseProgress } from "./use-workout-view";
+import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 
 /** Список вправ з прогресом: ліва колонка на десктопі й шторка на телефоні. */
 export function ExerciseList({ onPick }: { onPick?: () => void }) {
+  const t = useTranslations("workout");
+  const locale = useLocale();
   const items = useExerciseProgress();
   const currentIndex = useWorkout((s) => s.currentIndex);
   const goTo = useWorkout((s) => s.goTo);
@@ -31,19 +36,19 @@ export function ExerciseList({ onPick }: { onPick?: () => void }) {
                   "flex w-full items-center gap-3.5 rounded-xl border px-3.5 py-3 text-left transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
                   active
                     ? "border-primary bg-primary/7 shadow-[0_0_0_1px_var(--color-primary)]"
-                    : "border-white/5 bg-white/2.5 hover:bg-white/5",
+                    : "border-foreground/5 bg-foreground/2.5 hover:bg-foreground/5",
                 )}
               >
-                <ExerciseIcon equipment={exercise.equipment} className="size-7" />
+                <ExerciseThumb exercise={exercise} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold">{exercise.name}</span>
+                  <span className="block truncate text-[15px] font-semibold">{exerciseName(exercise, locale)}</span>
                   <span className="block text-xs text-muted-foreground">
-                    {done}/{total} sets
+                    {t("setsProgress", { done, total })}
                   </span>
                 </span>
                 {complete ? (
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="size-4" strokeWidth={3} aria-label="Done" />
+                    <Check className="size-4" strokeWidth={3} aria-label={t("col.done")} />
                   </span>
                 ) : (
                   <ProgressDots done={done} total={total} />
@@ -56,10 +61,10 @@ export function ExerciseList({ onPick }: { onPick?: () => void }) {
       <button
         type="button"
         onClick={openAddExercise}
-        className="mt-1.5 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 text-sm font-medium text-foreground/85 transition hover:border-primary/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+        className="mt-1.5 flex h-12 w-full items-center justify-center gap-2 rounded-full border border-dashed border-foreground/20 text-sm font-medium text-foreground/85 transition hover:border-primary/60 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
       >
         <Plus className="size-4" aria-hidden />
-        Add exercise
+        {t("addExercise")}
       </button>
     </div>
   );

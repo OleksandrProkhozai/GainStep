@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { LayoutGrid } from "lucide-react";
-import { ComingSoon } from "@/components/app-shell/coming-soon";
+import { getTranslations } from "next-intl/server";
+import { ProgramsWorkspace } from "@/components/programs/programs-workspace";
 
-export const metadata: Metadata = { title: "Programs · GainStep" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("programs");
+  return { title: t("title") };
+}
 
-export default function Page() {
-  return <ComingSoon title="Programs" icon={LayoutGrid} />;
+/** Список програм; на lg+ справа — редактор активної програми. */
+export default function ProgramsPage() {
+  return <ProgramsWorkspace selectedId={null} />;
 }

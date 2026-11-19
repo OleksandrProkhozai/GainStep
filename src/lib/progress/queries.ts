@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { WeightUnit } from "@/lib/units";
+import { localizedName } from "@/lib/i18n/names";
 import type { Database } from "@/types/database.types";
 import type { BodyWeightEntry } from "./body-weight";
 import {
@@ -15,7 +15,6 @@ import {
 type Client = SupabaseClient<Database>;
 
 export type ProgressData = {
-  unit: WeightUnit;
   exercises: ExerciseHistory[];
   records: PersonalRecord[];
   weeklyVolume: WeekVolume[];
@@ -38,18 +37,17 @@ export async function getProgressData(
   supabase: Client,
   userId: string,
   now = new Date(),
+  /** Мова назв системних вправ (name_uk). */
+  locale = "en",
 ): Promise<ProgressData> {
-  const [profileRes, bodyWeight, sets] = await Promise.all([
-    supabase.from("profiles").select("unit").eq("id", userId).maybeSingle(),
+  const [bodyWeight, sets] = await Promise.all([
     getBodyWeightEntries(supabase, userId),
-    getAllCompletedSets(supabase, userId),
+    getAllCompletedSets(supabase, userId, locale),
   ]);
-  if (profileRes.error) throw profileRes.error;
 
   const exercises = buildExerciseHistories(sets);
 
   return {
-    unit: profileRes.data?.unit ?? "kg",
     exercises,
     records: personalRecords(exercises),
     weeklyVolume: weeklyVolume(sets, now, VOLUME_WEEKS),
@@ -75,14 +73,14 @@ async function getBodyWeightEntries(supabase: Client, userId: string): Promise<B
   return result;
 }
 
-async function getAllCompletedSets(supabase: Client, userId: string): Promise<ProgressSet[]> {
+async function getAllCompletedSets(supabase: Client, userId: string, locale: string): Promise<ProgressSet[]> {
   const result: ProgressSet[] = [];
   for (let page = 0; page < MAX_PAGES; page++) {
     const from = page * PAGE_SIZE;
     const { data, error } = await supabase
       .from("workout_sets")
       .select(
-        "id, weight, reps, exercise_id, workout_id, exercises ( name ), workouts!inner ( started_at, status, user_id )",
+        "id, weight, reps, exercise_id, workout_id, exercises ( name, name_uk, muscle_group ), workouts!inner ( started_at, status, user_id )",
       )
       .eq("is_completed", true)
       .eq("workouts.status", "completed")
@@ -94,7 +92,8 @@ async function getAllCompletedSets(supabase: Client, userId: string): Promise<Pr
     for (const s of data) {
       result.push({
         exerciseId: s.exercise_id,
-        exerciseName: s.exercises?.name ?? "Exercise",
+        exerciseName: s.exercises ? localizedName(s.exercises, locale) : "—",
+        muscleGroup: s.exercises?.muscle_group,
         workoutId: s.workout_id,
         startedAt: s.workouts.started_at,
         weight: Number(s.weight),

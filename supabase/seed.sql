@@ -6,86 +6,145 @@
 -- ---------------------------------------------------------------------
 -- Системні вправи (owner_id = null)
 -- ---------------------------------------------------------------------
-insert into public.exercises (owner_id, name, muscle_group, equipment, is_compound, weight_increment, description)
+insert into public.exercises (owner_id, name, name_uk, muscle_group, equipment, is_compound, weight_increment, description)
 values
   -- Груди
-  (null, 'Bench Press',              'chest',      'barbell',    true,  2.5,  'Жим штанги лежачи на горизонтальній лаві.'),
-  (null, 'Incline Bench Press',      'chest',      'barbell',    true,  2.5,  'Жим штанги лежачи на похилій лаві (30–45°).'),
-  (null, 'Incline Dumbbell Press',   'chest',      'dumbbell',   true,  2.0,  'Жим гантелей на похилій лаві.'),
-  (null, 'Dumbbell Fly',             'chest',      'dumbbell',   false, 1.0,  'Розведення гантелей лежачи.'),
-  (null, 'Cable Crossover',          'chest',      'cable',      false, 2.5,  'Зведення рук у кросовері.'),
-  (null, 'Push-up',                  'chest',      'bodyweight', true,  2.5,  'Віджимання від підлоги.'),
-  (null, 'Dips',                     'chest',      'bodyweight', true,  2.5,  'Віджимання на брусах.'),
+  (null, 'Bench Press',              'Жим штанги лежачи', 'chest',      'barbell',    true,  2.5,  'Жим штанги лежачи на горизонтальній лаві.'),
+  (null, 'Incline Bench Press',      'Жим штанги на похилій лаві', 'chest',      'barbell',    true,  2.5,  'Жим штанги лежачи на похилій лаві (30–45°).'),
+  (null, 'Incline Dumbbell Press',   'Жим гантелей на похилій лаві', 'chest',      'dumbbell',   true,  2.0,  'Жим гантелей на похилій лаві.'),
+  (null, 'Dumbbell Fly',             'Розведення гантелей лежачи', 'chest',      'dumbbell',   false, 1.0,  'Розведення гантелей лежачи.'),
+  (null, 'Cable Crossover',          'Зведення рук у кросовері', 'chest',      'cable',      false, 2.5,  'Зведення рук у кросовері.'),
+  (null, 'Push-up',                  'Віджимання', 'chest',      'bodyweight', true,  2.5,  'Віджимання від підлоги.'),
+  (null, 'Dips',                     'Віджимання на брусах', 'chest',      'bodyweight', true,  2.5,  'Віджимання на брусах.'),
+  (null, 'Incline Machine Chest Press', 'Жим від грудей у тренажері під нахилом', 'chest', 'machine', true,  2.5, 'Жим від грудей у тренажері з похилою спинкою.'),
+  (null, 'Pec Deck Fly',                'Зведення рук у тренажері «метелик»',     'chest', 'machine', false, 2.5, 'Зведення рук перед грудьми в тренажері «метелик».'),
   -- Спина
-  (null, 'Deadlift',                 'back',       'barbell',    true,  5.0,  'Станова тяга штанги з підлоги.'),
-  (null, 'Barbell Row',              'back',       'barbell',    true,  2.5,  'Тяга штанги в нахилі.'),
-  (null, 'Dumbbell Row',             'back',       'dumbbell',   true,  2.0,  'Тяга гантелі однією рукою в нахилі.'),
-  (null, 'Pull-up',                  'back',       'bodyweight', true,  2.5,  'Підтягування широким хватом.'),
-  (null, 'Lat Pulldown',             'back',       'cable',      true,  2.5,  'Тяга верхнього блока до грудей.'),
-  (null, 'Seated Cable Row',         'back',       'cable',      true,  2.5,  'Тяга нижнього блока сидячи.'),
-  (null, 'T-Bar Row',                'back',       'machine',    true,  2.5,  'Тяга Т-грифа в нахилі.'),
+  (null, 'Deadlift',                 'Станова тяга', 'back',       'barbell',    true,  5.0,  'Станова тяга штанги з підлоги.'),
+  (null, 'Barbell Row',              'Тяга штанги в нахилі', 'back',       'barbell',    true,  2.5,  'Тяга штанги в нахилі.'),
+  (null, 'Dumbbell Row',             'Тяга гантелі однією рукою', 'back',       'dumbbell',   true,  2.0,  'Тяга гантелі однією рукою в нахилі.'),
+  (null, 'Pull-up',                  'Підтягування', 'back',       'bodyweight', true,  2.5,  'Підтягування широким хватом.'),
+  (null, 'Lat Pulldown',             'Тяга верхнього блока', 'back',       'cable',      true,  2.5,  'Тяга верхнього блока до грудей.'),
+  (null, 'Seated Cable Row',         'Тяга нижнього блока сидячи', 'back',       'cable',      true,  2.5,  'Тяга нижнього блока сидячи.'),
+  (null, 'T-Bar Row',                'Тяга Т-грифа', 'back',       'machine',    true,  2.5,  'Тяга Т-грифа в нахилі.'),
+  (null, 'Wide-Grip Lat Pulldown',      'Тяга верхнього блока широким хватом',    'back',  'cable',   true,  2.5, 'Тяга верхнього блока до грудей широким хватом.'),
+  (null, 'Close-Grip Lat Pulldown',     'Тяга верхнього блока вузьким хватом',    'back',  'cable',   true,  2.5, 'Тяга верхнього блока до грудей вузьким хватом.'),
+  (null, 'Cable Row Machine',           'Важільна тяга з тросом',                 'back',  'machine', true,  2.5, 'Тяга в важільному тренажері з тросовим механізмом.'),
+  (null, 'Plate-Loaded Row Machine',    'Важільна тяга з дисками',                'back',  'machine', true,  5.0, 'Тяга у важільному тренажері з навішуванням дисків.'),
   -- Плечі
-  (null, 'Overhead Press',           'shoulders',  'barbell',    true,  2.5,  'Жим штанги стоячи над головою.'),
-  (null, 'Dumbbell Shoulder Press',  'shoulders',  'dumbbell',   true,  2.0,  'Жим гантелей сидячи над головою.'),
-  (null, 'Lateral Raise',            'shoulders',  'dumbbell',   false, 1.0,  'Махи гантелями в сторони.'),
-  (null, 'Face Pull',                'shoulders',  'cable',      false, 2.5,  'Тяга канату до обличчя.'),
-  (null, 'Rear Delt Fly',            'shoulders',  'machine',    false, 2.5,  'Зворотні розведення в тренажері.'),
+  (null, 'Overhead Press',           'Жим штанги стоячи', 'shoulders',  'barbell',    true,  2.5,  'Жим штанги стоячи над головою.'),
+  (null, 'Dumbbell Shoulder Press',  'Жим гантелей сидячи', 'shoulders',  'dumbbell',   true,  2.0,  'Жим гантелей сидячи над головою.'),
+  (null, 'Lateral Raise',            'Махи гантелями в сторони', 'shoulders',  'dumbbell',   false, 1.0,  'Махи гантелями в сторони.'),
+  (null, 'Face Pull',                'Тяга канату до обличчя', 'shoulders',  'cable',      false, 2.5,  'Тяга канату до обличчя.'),
+  (null, 'Rear Delt Fly',            'Розведення гантелей у нахилі', 'shoulders',  'machine',    false, 2.5,  'Зворотні розведення в тренажері.'),
+  (null, 'Machine Shoulder Press',      'Жим плечима в тренажері',                'shoulders', 'machine', true,  2.5, 'Жим ручок тренажера вгору сидячи.'),
+  (null, 'Machine Lateral Raise',       'Відведення рук у сторони в тренажері',   'shoulders', 'machine', false, 2.5, 'Відведення рук у сторони в тренажері для середніх дельт.'),
   -- Біцепс
-  (null, 'Barbell Curl',             'biceps',     'barbell',    false, 2.5,  'Підйом штанги на біцепс стоячи.'),
-  (null, 'Dumbbell Curl',            'biceps',     'dumbbell',   false, 1.0,  'Підйом гантелей на біцепс.'),
-  (null, 'Hammer Curl',              'biceps',     'dumbbell',   false, 1.0,  'Молоткові згинання з гантелями.'),
+  (null, 'Barbell Curl',             'Підйом штанги на біцепс', 'biceps',     'barbell',    false, 2.5,  'Підйом штанги на біцепс стоячи.'),
+  (null, 'Dumbbell Curl',            'Підйом гантелей на біцепс', 'biceps',     'dumbbell',   false, 1.0,  'Підйом гантелей на біцепс.'),
+  (null, 'Hammer Curl',              'Молотки з гантелями', 'biceps',     'dumbbell',   false, 1.0,  'Молоткові згинання з гантелями.'),
+  (null, 'Cable Biceps Curl',           'Підйом на біцепс у кросовері',           'biceps', 'cable',   false, 2.5, 'Згинання рук на біцепс з нижнього блока кросовера.'),
+  (null, 'Machine Biceps Curl',         'Підйом на біцепс у тренажері',           'biceps', 'machine', false, 2.5, 'Згинання рук на біцепс у важільному тренажері.'),
+  (null, 'Preacher Curl',               'Згинання рук на біцепс на лаві Скотта',  'biceps', 'barbell', false, 2.5, 'Ізольоване згинання рук на біцепс з упором на лаві Скотта.'),
   -- Трицепс
-  (null, 'Triceps Pushdown',         'triceps',    'cable',      false, 2.5,  'Розгинання рук на верхньому блоці.'),
-  (null, 'Skull Crusher',            'triceps',    'barbell',    false, 2.5,  'Французький жим лежачи.'),
-  (null, 'Overhead Triceps Extension','triceps',   'dumbbell',   false, 1.0,  'Розгинання гантелі з-за голови.'),
+  (null, 'Triceps Pushdown',         'Розгинання рук на блоці', 'triceps',    'cable',      false, 2.5,  'Розгинання рук на верхньому блоці.'),
+  (null, 'Skull Crusher',            'Французький жим лежачи', 'triceps',    'barbell',    false, 2.5,  'Французький жим лежачи.'),
+  (null, 'Overhead Triceps Extension','Розгинання гантелі з-за голови', 'triceps',   'dumbbell',   false, 1.0,  'Розгинання гантелі з-за голови.'),
+  (null, 'Rope Triceps Pushdown',       'Розгинання рук на трицепс з канатною рукояткою',    'triceps', 'cable', false, 2.5, 'Розгинання рук на верхньому блоці кросовера з канатною рукояткою.'),
+  (null, 'V-Bar Triceps Pushdown',      'Розгинання рук на трицепс з V-подібною рукояткою',  'triceps', 'cable', false, 2.5, 'Розгинання рук на верхньому блоці кросовера з V-подібною рукояткою (трикутником).'),
   -- Квадрицепс
-  (null, 'Back Squat',               'quads',      'barbell',    true,  5.0,  'Присідання зі штангою на спині.'),
-  (null, 'Front Squat',              'quads',      'barbell',    true,  2.5,  'Присідання зі штангою на грудях.'),
-  (null, 'Leg Press',                'quads',      'machine',    true,  5.0,  'Жим ногами в тренажері.'),
-  (null, 'Bulgarian Split Squat',    'quads',      'dumbbell',   true,  2.0,  'Болгарські випади з гантелями.'),
-  (null, 'Leg Extension',            'quads',      'machine',    false, 2.5,  'Розгинання ніг сидячи.'),
+  (null, 'Back Squat',               'Присідання зі штангою', 'quads',      'barbell',    true,  5.0,  'Присідання зі штангою на спині.'),
+  (null, 'Front Squat',              'Фронтальні присідання', 'quads',      'barbell',    true,  2.5,  'Присідання зі штангою на грудях.'),
+  (null, 'Leg Press',                'Жим ногами', 'quads',      'machine',    true,  5.0,  'Жим ногами в тренажері.'),
+  (null, 'Bulgarian Split Squat',    'Болгарські присідання', 'quads',      'dumbbell',   true,  2.0,  'Болгарські випади з гантелями.'),
+  (null, 'Leg Extension',            'Розгинання ніг у тренажері', 'quads',      'machine',    false, 2.5,  'Розгинання ніг сидячи.'),
   -- Задня поверхня стегна / сідниці
-  (null, 'Romanian Deadlift',        'hamstrings', 'barbell',    true,  2.5,  'Румунська тяга з прямими ногами.'),
-  (null, 'Lying Leg Curl',           'hamstrings', 'machine',    false, 2.5,  'Згинання ніг лежачи.'),
-  (null, 'Hip Thrust',               'glutes',     'barbell',    true,  5.0,  'Сідничний міст зі штангою.'),
-  (null, 'Walking Lunge',            'glutes',     'dumbbell',   true,  2.0,  'Випади в русі з гантелями.'),
+  (null, 'Romanian Deadlift',        'Румунська тяга', 'hamstrings', 'barbell',    true,  2.5,  'Румунська тяга з прямими ногами.'),
+  (null, 'Lying Leg Curl',           'Згинання ніг лежачи', 'hamstrings', 'machine',    false, 2.5,  'Згинання ніг лежачи.'),
+  (null, 'Hip Thrust',               'Ягідичний міст зі штангою', 'glutes',     'barbell',    true,  5.0,  'Сідничний міст зі штангою.'),
+  (null, 'Walking Lunge',            'Випади в ходьбі', 'glutes',     'dumbbell',   true,  2.0,  'Випади в русі з гантелями.'),
   -- Литки
-  (null, 'Standing Calf Raise',      'calves',     'machine',    false, 2.5,  'Підйоми на носки стоячи.'),
-  (null, 'Seated Calf Raise',        'calves',     'machine',    false, 2.5,  'Підйоми на носки сидячи.'),
+  (null, 'Standing Calf Raise',      'Підйоми на носки стоячи', 'calves',     'machine',    false, 2.5,  'Підйоми на носки стоячи.'),
+  (null, 'Seated Calf Raise',        'Підйоми на носки сидячи', 'calves',     'machine',    false, 2.5,  'Підйоми на носки сидячи.'),
   -- Прес / кор
-  (null, 'Plank',                    'core',       'bodyweight', false, 2.5,  'Планка на передпліччях (повтори = секунди).'),
-  (null, 'Hanging Leg Raise',        'core',       'bodyweight', false, 2.5,  'Підйом ніг у висі на турніку.'),
-  (null, 'Cable Crunch',             'core',       'cable',      false, 2.5,  'Скручування на верхньому блоці.'),
-  (null, 'Kettlebell Swing',         'glutes',     'kettlebell', true,  4.0,  'Махи гирею двома руками.')
+  (null, 'Plank',                    'Планка', 'core',       'bodyweight', false, 2.5,  'Планка на передпліччях (повтори = секунди).'),
+  (null, 'Hanging Leg Raise',        'Підйоми ніг у висі', 'core',       'bodyweight', false, 2.5,  'Підйом ніг у висі на турніку.'),
+  (null, 'Cable Crunch',             'Скручування на блоці', 'core',       'cable',      false, 2.5,  'Скручування на верхньому блоці.'),
+  (null, 'Kettlebell Swing',         'Махи гирею', 'glutes',     'kettlebell', true,  4.0,  'Махи гирею двома руками.')
 on conflict do nothing;
+
+-- Повторний запуск seed на базі без перекладів: дописуємо name_uk.
+update public.exercises e set name_uk = v.name_uk
+from (values
+  ('Bench Press', 'Жим штанги лежачи'),
+  ('Incline Bench Press', 'Жим штанги на похилій лаві'),
+  ('Incline Dumbbell Press', 'Жим гантелей на похилій лаві'),
+  ('Dumbbell Fly', 'Розведення гантелей лежачи'),
+  ('Cable Crossover', 'Зведення рук у кросовері'),
+  ('Push-up', 'Віджимання'),
+  ('Dips', 'Віджимання на брусах'),
+  ('Deadlift', 'Станова тяга'),
+  ('Barbell Row', 'Тяга штанги в нахилі'),
+  ('Dumbbell Row', 'Тяга гантелі однією рукою'),
+  ('Pull-up', 'Підтягування'),
+  ('Lat Pulldown', 'Тяга верхнього блока'),
+  ('Seated Cable Row', 'Тяга нижнього блока сидячи'),
+  ('T-Bar Row', 'Тяга Т-грифа'),
+  ('Overhead Press', 'Жим штанги стоячи'),
+  ('Dumbbell Shoulder Press', 'Жим гантелей сидячи'),
+  ('Lateral Raise', 'Махи гантелями в сторони'),
+  ('Face Pull', 'Тяга канату до обличчя'),
+  ('Rear Delt Fly', 'Розведення гантелей у нахилі'),
+  ('Barbell Curl', 'Підйом штанги на біцепс'),
+  ('Dumbbell Curl', 'Підйом гантелей на біцепс'),
+  ('Hammer Curl', 'Молотки з гантелями'),
+  ('Triceps Pushdown', 'Розгинання рук на блоці'),
+  ('Skull Crusher', 'Французький жим лежачи'),
+  ('Overhead Triceps Extension', 'Розгинання гантелі з-за голови'),
+  ('Back Squat', 'Присідання зі штангою'),
+  ('Front Squat', 'Фронтальні присідання'),
+  ('Leg Press', 'Жим ногами'),
+  ('Bulgarian Split Squat', 'Болгарські присідання'),
+  ('Leg Extension', 'Розгинання ніг у тренажері'),
+  ('Romanian Deadlift', 'Румунська тяга'),
+  ('Lying Leg Curl', 'Згинання ніг лежачи'),
+  ('Hip Thrust', 'Ягідичний міст зі штангою'),
+  ('Walking Lunge', 'Випади в ходьбі'),
+  ('Standing Calf Raise', 'Підйоми на носки стоячи'),
+  ('Seated Calf Raise', 'Підйоми на носки сидячи'),
+  ('Plank', 'Планка'),
+  ('Hanging Leg Raise', 'Підйоми ніг у висі'),
+  ('Cable Crunch', 'Скручування на блоці'),
+  ('Kettlebell Swing', 'Махи гирею')
+) as v(name, name_uk)
+where e.owner_id is null and e.name = v.name and e.name_uk is distinct from v.name_uk;
 
 -- ---------------------------------------------------------------------
 -- Шаблони програм (owner_id = null) з фіксованими id
 -- ---------------------------------------------------------------------
-insert into public.programs (id, owner_id, name, description, days_per_week)
+insert into public.programs (id, owner_id, name, name_uk, description, days_per_week)
 values
-  ('10000000-0000-0000-0000-000000000001', null, 'Full Body',
+  ('10000000-0000-0000-0000-000000000001', null, 'Full Body', 'Все тіло',
    'Все тіло за одне тренування, 3 рази на тиждень. Підходить новачкам.', 3),
-  ('10000000-0000-0000-0000-000000000002', null, 'Upper / Lower',
+  ('10000000-0000-0000-0000-000000000002', null, 'Upper / Lower', 'Верх / Низ',
    'Верх і низ тіла по черзі, 4 тренування на тиждень.', 4),
-  ('10000000-0000-0000-0000-000000000003', null, 'Push Pull Legs',
+  ('10000000-0000-0000-0000-000000000003', null, 'Push Pull Legs', 'Жим / Тяга / Ноги',
    'Жими, тяги, ноги. Класичний спліт для середнього рівня.', 6)
-on conflict (id) do nothing;
+on conflict (id) do update set name_uk = excluded.name_uk;
 
 -- Дні шаблонів
-insert into public.program_days (id, program_id, name, position)
+insert into public.program_days (id, program_id, name, name_uk, position)
 values
   -- Full Body
-  ('20000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000001', 'Full Body A', 0),
-  ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001', 'Full Body B', 1),
+  ('20000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000001', 'Full Body A', 'Все тіло A', 0),
+  ('20000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000001', 'Full Body B', 'Все тіло B', 1),
   -- Upper / Lower
-  ('20000000-0000-0000-0000-000000000201', '10000000-0000-0000-0000-000000000002', 'Upper', 0),
-  ('20000000-0000-0000-0000-000000000202', '10000000-0000-0000-0000-000000000002', 'Lower', 1),
+  ('20000000-0000-0000-0000-000000000201', '10000000-0000-0000-0000-000000000002', 'Upper', 'Верх', 0),
+  ('20000000-0000-0000-0000-000000000202', '10000000-0000-0000-0000-000000000002', 'Lower', 'Низ', 1),
   -- Push Pull Legs
-  ('20000000-0000-0000-0000-000000000301', '10000000-0000-0000-0000-000000000003', 'Push', 0),
-  ('20000000-0000-0000-0000-000000000302', '10000000-0000-0000-0000-000000000003', 'Pull', 1),
-  ('20000000-0000-0000-0000-000000000303', '10000000-0000-0000-0000-000000000003', 'Legs', 2)
-on conflict (id) do nothing;
+  ('20000000-0000-0000-0000-000000000301', '10000000-0000-0000-0000-000000000003', 'Push', 'Жим', 0),
+  ('20000000-0000-0000-0000-000000000302', '10000000-0000-0000-0000-000000000003', 'Pull', 'Тяга', 1),
+  ('20000000-0000-0000-0000-000000000303', '10000000-0000-0000-0000-000000000003', 'Legs', 'Ноги', 2)
+on conflict (id) do update set name_uk = excluded.name_uk;
 
 -- Вправи днів: (день, позиція, назва вправи, підходи, мін, макс, відпочинок)
 insert into public.program_exercises

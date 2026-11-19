@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Eye, EyeOff, Lock, type LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,15 +69,16 @@ type PasswordInputProps = Omit<
   React.ComponentProps<"input">,
   "type"
 > & {
-  label?: string;
+  label: string;
   error?: string;
 };
 
 /** Поле пароля з кнопкою показати/сховати. */
 export function PasswordInput({
-  label = "Password",
+  label,
   ...props
 }: PasswordInputProps) {
+  const t = useTranslations("auth");
   const [visible, setVisible] = useState(false);
 
   return (
@@ -89,7 +91,7 @@ export function PasswordInput({
           type="button"
           onClick={() => setVisible((v) => !v)}
           className="flex size-10 items-center justify-center rounded-full text-white/50 transition-colors hover:text-white focus-visible:ring-3 focus-visible:ring-[#c6f432]/40 focus-visible:outline-none"
-          aria-label={visible ? "Hide password" : "Show password"}
+          aria-label={visible ? t("hidePassword") : t("showPassword")}
           aria-pressed={visible}
         >
           {visible ? <EyeOff className="size-5" /> : <Eye className="size-5" />}

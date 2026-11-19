@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Dumbbell } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 const LIME = "198 244 50";
@@ -32,6 +33,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 }
 
 function Hero() {
+  const t = useTranslations("auth.hero");
   return (
     <aside className="relative flex h-[38svh] min-h-[260px] flex-col justify-center overflow-hidden px-6 pt-[calc(env(safe-area-inset-top)+1.25rem)] pb-14 md:h-auto md:min-h-0 md:px-12 md:py-14">
       <Image
@@ -67,9 +69,9 @@ function Hero() {
           <span className="text-[#c6f432]">Step</span>
         </p>
         <p className="mt-3 text-sm leading-snug text-white/70 md:mt-4 md:text-base lg:text-lg">
-          Track every lift.
+          {t("line1")}
           <br />
-          Progress automatically.
+          {t("line2")}
         </p>
       </div>
     </aside>

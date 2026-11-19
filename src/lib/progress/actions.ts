@@ -26,8 +26,8 @@ async function requireUser() {
 
 /** Дата запису: справжня, не в майбутньому (в поясі користувача) і не давніша за 1900 рік. */
 function checkDate(date: string): string | null {
-  if (!isDayKey(date) || date < "1900-01-01") return "Pick a valid date";
-  if (date > toDayKey(new Date())) return "You can't log weight for a future date";
+  if (!isDayKey(date) || date < "1900-01-01") return "dateInvalid";
+  if (date > toDayKey(new Date())) return "dateFuture";
   return null;
 }
 
@@ -43,7 +43,7 @@ export async function logBodyWeight(input: {
   date: string;
 }): Promise<LogWeightResult> {
   const parsedInput = inputSchema.safeParse(input);
-  if (!parsedInput.success) return { ok: false, error: "Invalid input" };
+  if (!parsedInput.success) return { ok: false, error: "invalidForm" };
   const { value, unit, date } = parsedInput.data;
 
   const weight = validateBodyWeight(value, unit);
@@ -52,7 +52,7 @@ export async function logBodyWeight(input: {
   if (dateError) return { ok: false, error: dateError };
 
   const { supabase, userId } = await requireUser();
-  if (!userId) return { ok: false, error: "Your session has expired. Sign in again." };
+  if (!userId) return { ok: false, error: "sessionExpired" };
 
   const { data: existing, error: readError } = await supabase
     .from("body_weight_entries")
@@ -62,7 +62,7 @@ export async function logBodyWeight(input: {
     .maybeSingle();
   if (readError) {
     console.error("logBodyWeight: read", readError);
-    return { ok: false, error: "Couldn't save your weight. Please try again." };
+    return { ok: false, error: "bodyWeightSaveFailed" };
   }
 
   const weightKg = bodyWeightToKg(weight.value, unit);
@@ -74,7 +74,7 @@ export async function logBodyWeight(input: {
     );
   if (error) {
     console.error("logBodyWeight: upsert", error);
-    return { ok: false, error: "Couldn't save your weight. Please try again." };
+    return { ok: false, error: "bodyWeightSaveFailed" };
   }
 
   revalidatePath("/progress");
@@ -83,10 +83,10 @@ export async function logBodyWeight(input: {
 
 /** Видалення запису ваги за дату. */
 export async function deleteBodyWeight(date: string): Promise<DeleteWeightResult> {
-  if (typeof date !== "string" || !isDayKey(date)) return { ok: false, error: "Entry not found" };
+  if (typeof date !== "string" || !isDayKey(date)) return { ok: false, error: "entryNotFound" };
 
   const { supabase, userId } = await requireUser();
-  if (!userId) return { ok: false, error: "Your session has expired. Sign in again." };
+  if (!userId) return { ok: false, error: "sessionExpired" };
 
   const { error } = await supabase
     .from("body_weight_entries")
@@ -95,7 +95,7 @@ export async function deleteBodyWeight(date: string): Promise<DeleteWeightResult
     .eq("recorded_on", date);
   if (error) {
     console.error("deleteBodyWeight", error);
-    return { ok: false, error: "Couldn't delete the entry. Please try again." };
+    return { ok: false, error: "entryDeleteFailed" };
   }
 
   revalidatePath("/progress");

@@ -1,7 +1,8 @@
 import { Trophy } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { PersonalRecord } from "@/lib/progress/derive";
 import { toDisplayWeight, type WeightUnit } from "@/lib/units";
-import { Card, CardTitle, formatNumber, shortDate } from "./parts";
+import { Card, CardTitle, useProgressFormat } from "./parts";
 
 /** Рекорд вважається новим упродовж тижня. */
 const NEW_FOR_MS = 7 * 24 * 60 * 60 * 1000;
@@ -17,20 +18,22 @@ export function RecordsCard({
   unit: WeightUnit;
   now: number;
 }) {
-  const w = (kg: number) => `${formatNumber(toDisplayWeight(kg, unit))} ${unit}`;
+  const t = useTranslations("progress.records");
+  const pf = useProgressFormat();
+  const w = (kg: number) => `${pf.number(toDisplayWeight(kg, unit))} ${pf.unit(unit)}`;
   return (
     <Card>
       <header className="flex items-center gap-2">
         <Trophy className="size-5 text-yellow-400" aria-hidden />
-        <CardTitle>Personal records</CardTitle>
+        <CardTitle>{t("title")}</CardTitle>
       </header>
 
       {records.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
-          Your best sets will appear here after the first workout.
+        <p className="mt-4 rounded-xl border border-dashed border-foreground/10 px-4 py-8 text-center text-sm text-muted-foreground">
+          {t("empty")}
         </p>
       ) : (
-        <ul className="mt-2 divide-y divide-white/5">
+        <ul className="mt-2 divide-y divide-foreground/5">
           {records.slice(0, MAX_ROWS).map((r) => {
             const isNew = now - r.t < NEW_FOR_MS;
             return (
@@ -44,18 +47,18 @@ export function RecordsCard({
                     {w(r.weight)} × {r.reps}
                   </p>
                   <p className="text-xs whitespace-nowrap text-muted-foreground">
-                    <span className="sr-only">Estimated 1RM </span>
+                    <span className="sr-only">{t("e1rm")} </span>
                     {w(r.e1rm)}
                   </p>
                 </div>
                 <div className="flex w-14 flex-col items-end gap-1">
                   {isNew && (
                     <span className="rounded-md bg-primary px-1.5 py-0.5 text-[10px] leading-none font-extrabold tracking-wide text-primary-foreground">
-                      NEW
+                      {t("new")}
                     </span>
                   )}
                   <time className="text-xs whitespace-nowrap text-muted-foreground" dateTime={new Date(r.t).toISOString()}>
-                    {shortDate.format(r.t)}
+                    {pf.shortDate(r.t)}
                   </time>
                 </div>
               </li>

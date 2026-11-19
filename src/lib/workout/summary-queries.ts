@@ -4,6 +4,8 @@ import type { WeightUnit } from "@/lib/units";
 import type { Database } from "@/types/database.types";
 import { loadExerciseHistory } from "./queries";
 import { buildWorkoutSummary, type SummaryExerciseInput, type WorkoutSummary } from "./summary";
+import { localizedName } from "@/lib/i18n/names";
+import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { ADDED_EXERCISE_DEFAULTS } from "./types";
 
 type Client = SupabaseClient<Database>;
@@ -21,13 +23,14 @@ export type SummaryPageData = {
   dayName: string | null;
   startedAt: string;
   notes: string;
+  /** Одиниці користувача — з getCurrentUser() (сторінка додає). */
   unit: WeightUnit;
   summary: WorkoutSummary;
   nextUp: NextUp | null;
 };
 
 export type LoadSummaryResult =
-  | { kind: "ok"; data: SummaryPageData }
+  | { kind: "ok"; data: Omit<SummaryPageData, "unit"> }
   | { kind: "not-found" }
   | { kind: "in-progress" };
 
@@ -43,8 +46,10 @@ export async function loadWorkoutSummary(
   supabase: Client,
   workoutId: string,
   userId: string,
+  /** Мова назв системних вправ і шаблонів (name_uk). */
+  locale = "en",
 ): Promise<LoadSummaryResult> {
-  const [workoutRes, profileRes, setsRes] = await Promise.all([
+  const [workoutRes, setsRes, templateNames] = await Promise.all([
     supabase
       .from("workouts")
       .select(
@@ -55,25 +60,26 @@ export async function loadWorkoutSummary(
            program:programs (
              name,
              program_days ( id, name, position,
-               program_exercises ( position, exercises ( name ) ) )
+               program_exercises ( position, exercises ( name, name_uk ) ) )
            )
          )`,
       )
       .eq("id", workoutId)
       .eq("user_id", userId)
       .maybeSingle(),
-    supabase.from("profiles").select("unit").eq("id", userId).maybeSingle(),
     supabase
       .from("workout_sets")
       .select(
-        "exercise_id, exercise_position, set_number, weight, reps, is_completed, exercise:exercises ( id, name, weight_increment )",
+        "exercise_id, exercise_position, set_number, weight, reps, is_completed, exercise:exercises ( id, name, name_uk, weight_increment, muscle_group )",
       )
       .eq("workout_id", workoutId)
       .order("exercise_position")
       .order("set_number"),
+    getTemplateNames(supabase),
   ]);
   if (workoutRes.error) throw workoutRes.error;
-  if (profileRes.error) throw profileRes.error;
+  // Стандартні назви копій шаблонів і тренувань — мовою інтерфейсу.
+  const tn = (name: string) => templateName(name, templateNames, locale);
   if (setsRes.error) throw setsRes.error;
 
   const workout = workoutRes.data;
@@ -92,7 +98,8 @@ export async function loadWorkoutSummary(
     const pe = paramsById.get(s.exercise_id);
     exercises.push({
       exerciseId: s.exercise_id,
-      name: s.exercise.name,
+      name: localizedName(s.exercise, locale),
+      muscleGroup: s.exercise.muscle_group,
       repMin: pe?.rep_min ?? ADDED_EXERCISE_DEFAULTS.repMin,
       repMax: pe?.rep_max ?? ADDED_EXERCISE_DEFAULTS.repMax,
       targetSets: pe?.target_sets ?? ADDED_EXERCISE_DEFAULTS.targetSets,
@@ -153,9 +160,9 @@ export async function loadWorkoutSummary(
     if (next) {
       const names = [...next.program_exercises]
         .sort((a, b) => a.position - b.position)
-        .map((pe) => pe.exercises?.name ?? "Exercise");
+        .map((pe) => (pe.exercises ? localizedName(pe.exercises, locale) : "—"));
       nextUp = {
-        name: next.name,
+        name: tn(next.name),
         preview: names.slice(0, NEXT_UP_PREVIEW),
         more: Math.max(0, names.length - NEXT_UP_PREVIEW),
       };
@@ -166,12 +173,11 @@ export async function loadWorkoutSummary(
     kind: "ok",
     data: {
       workoutId: workout.id,
-      name: workout.name,
-      programName: day?.program?.name ?? null,
-      dayName: day?.name ?? null,
+      name: tn(workout.name),
+      programName: day?.program ? tn(day.program.name) : null,
+      dayName: day ? tn(day.name) : null,
       startedAt: workout.started_at,
       notes: workout.notes ?? "",
-      unit: profileRes.data?.unit ?? "kg",
       summary,
       nextUp,
     },

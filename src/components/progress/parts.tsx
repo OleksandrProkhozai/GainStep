@@ -1,38 +1,35 @@
 import type { ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { USER_TIME_ZONE } from "@/lib/dates";
+import { useLocale } from "next-intl";
+import { dateFormat } from "@/lib/dates";
+import { formatNumber as formatLocaleNumber, unitLabel, type WeightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
-export const LIME = "#c6f432";
-export const ORANGE = "#fb923c";
-export const CARD_BG = "#16171a";
-export const AXIS_TICK = { fill: "#8b8f98", fontSize: 11 };
-export const GRID_STROKE = "rgb(255 255 255 / 0.06)";
+/** "62.5" / "62,5". */
+export const formatNumber = (value: number, locale = "en") => formatLocaleNumber(value, locale);
 
-const number = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-export const formatNumber = (value: number) => number.format(value);
+const SHORT = { month: "short", day: "numeric" } as const;
+const LONG = { weekday: "short", month: "short", day: "numeric", year: "numeric" } as const;
 
-/** "Nov 17" — момент часу в поясі користувача. */
-export const shortDate = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: USER_TIME_ZONE,
-});
-export const longDate = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: USER_TIME_ZONE,
-});
-
-/** Календарна дата "YYYY-MM-DD" → "Nov 17" (без зсуву поясу). */
-const dayKeyFormat = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
-export const formatDayKey = (key: string) => dayKeyFormat.format(new Date(`${key}T00:00:00Z`));
+/**
+ * Числа й дати карток прогресу мовою інтерфейсу (працює і в серверних
+ * компонентах, і в клієнтських): "Nov 17" / "17 лист.", "62,5".
+ */
+export function useProgressFormat() {
+  const locale = useLocale();
+  return {
+    locale,
+    number: (value: number) => formatNumber(value, locale),
+    signed: (value: number) => signed(value, locale),
+    unit: (unit: WeightUnit) => unitLabel(unit, locale),
+    /** Момент часу в поясі користувача. */
+    shortDate: (t: number | Date) => dateFormat(locale, SHORT).format(t),
+    longDate: (t: number | Date) => dateFormat(locale, LONG).format(t),
+    /** Календарна дата "YYYY-MM-DD" (без зсуву поясу). */
+    dayKey: (key: string) =>
+      dateFormat(locale, { ...SHORT, timeZone: "UTC" }).format(new Date(`${key}T00:00:00Z`)),
+  };
+}
 
 export function Card({
   className,
@@ -41,7 +38,7 @@ export function Card({
 }: React.ComponentProps<"section">) {
   return (
     <section
-      className={cn("min-w-0 rounded-2xl border border-white/10 bg-card p-4 md:p-5", className)}
+      className={cn("min-w-0 rounded-2xl border border-foreground/10 bg-card p-4 md:p-5", className)}
       {...props}
     >
       {children}
@@ -85,7 +82,7 @@ export function Delta({
     <span
       className={cn(
         "inline-flex items-center gap-0.5 text-xs font-bold whitespace-nowrap md:text-sm",
-        up ? "text-primary" : neutralDown ? "text-muted-foreground" : "text-orange-400",
+        up ? "text-accent-text" : neutralDown ? "text-muted-foreground" : "text-orange-400",
         className,
       )}
     >
@@ -95,7 +92,7 @@ export function Delta({
   );
 }
 
-/** "+5", "−2.5" (справжній мінус). */
-export function signed(value: number) {
-  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatNumber(Math.abs(value))}`;
+/** "+5", "−2.5" (справжній мінус; uk — "−2,5"). */
+export function signed(value: number, locale = "en") {
+  return `${value > 0 ? "+" : value < 0 ? "−" : ""}${formatNumber(Math.abs(value), locale)}`;
 }

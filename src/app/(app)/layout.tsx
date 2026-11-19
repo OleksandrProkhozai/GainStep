@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import type { Viewport } from "next";
 import Link from "next/link";
-import { BottomNav } from "@/components/app-shell/bottom-nav";
+import { useTranslations } from "next-intl";
+import { BottomNav, BottomNavView } from "@/components/app-shell/bottom-nav";
 import { Logo } from "@/components/app-shell/logo";
-import { Sidebar } from "@/components/app-shell/sidebar";
+import { Sidebar, SidebarView } from "@/components/app-shell/sidebar";
+import { UserPreferences } from "@/components/preferences/user-preferences";
 import {
   HeaderUser,
   SidebarUser,
@@ -20,25 +22,30 @@ export const viewport: Viewport = {
 /**
  * Каркас застосунку (усі сторінки після входу й онбордингу).
  * Телефон (<md): шапка зверху + нижня панель. md–lg: вузький сайдбар.
- * lg+: сайдбар 240px. Навігація статична й потрапляє в static shell,
- * а дані користувача підвантажуються в Suspense.
+ * lg+: сайдбар 240px. Навігація читає usePathname(), тому вона в Suspense:
+ * на статичних маршрутах шлях відомий при пререндері й fallback не видно,
+ * а на динамічних (/programs/[id]) у static shell — навігація без
+ * підсвічування, яку одразу замінює справжня. Дані користувача — теж у Suspense.
  */
 export default function AppLayout({ children }: LayoutProps<"/">) {
+  const t = useTranslations("nav");
   return (
-    <div className="dark flex min-h-dvh flex-1 flex-col bg-background text-foreground">
-      <Sidebar
-        footer={
-          <Suspense fallback={<SidebarUserSkeleton />}>
-            <SidebarUser />
-          </Suspense>
-        }
-      />
+    <div className="flex min-h-dvh flex-1 flex-col bg-background text-foreground">
+      <Suspense fallback={<SidebarView pathname={null} footer={<SidebarUserSkeleton />} />}>
+        <Sidebar
+          footer={
+            <Suspense fallback={<SidebarUserSkeleton />}>
+              <SidebarUser />
+            </Suspense>
+          }
+        />
+      </Suspense>
 
       <div className="flex min-w-0 flex-1 flex-col md:pl-[76px] lg:pl-60">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-background/85 pt-[calc(env(safe-area-inset-top)+0.75rem)] pr-[calc(env(safe-area-inset-right)+1rem)] pb-3 pl-[calc(env(safe-area-inset-left)+1rem)] backdrop-blur-xl md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/85 pt-[calc(env(safe-area-inset-top)+0.75rem)] pr-[calc(env(safe-area-inset-right)+1rem)] pb-3 pl-[calc(env(safe-area-inset-left)+1rem)] backdrop-blur-xl md:hidden">
           <Link
             href="/"
-            aria-label="GainStep — dashboard"
+            aria-label={t("homeLink")}
             className="rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Logo />
@@ -49,11 +56,17 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         </header>
 
         <main className="mx-auto w-full max-w-[1200px] flex-1 pt-5 pr-[calc(env(safe-area-inset-right)+1rem)] pb-[calc(env(safe-area-inset-bottom)+6rem)] pl-[calc(env(safe-area-inset-left)+1rem)] md:px-6 md:pt-8 md:pb-10 lg:px-10">
-          {children}
+          {/* Налаштування (unit, таймер) для клієнтських компонентів; promise
+              створюється всередині Suspense, сторінка не чекає на нього. */}
+          <Suspense>
+            <UserPreferences>{children}</UserPreferences>
+          </Suspense>
         </main>
       </div>
 
-      <BottomNav />
+      <Suspense fallback={<BottomNavView pathname={null} />}>
+        <BottomNav />
+      </Suspense>
     </div>
   );
 }

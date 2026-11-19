@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { syncLocaleAfterAuth } from "@/lib/auth/locale";
 import { getPostAuthPath, safeNextPath } from "@/lib/auth/redirects";
 
 /**
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      await syncLocaleAfterAuth(supabase, data.user.id);
       const path = next ?? (await getPostAuthPath(supabase, data.user.id));
       return NextResponse.redirect(new URL(path, origin));
     }

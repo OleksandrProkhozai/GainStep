@@ -9,7 +9,7 @@ export function Card({
   ...props
 }: { className?: string; children: ReactNode } & React.ComponentProps<"section">) {
   return (
-    <section className={cn("rounded-2xl border border-white/10 bg-card p-4 lg:p-5", className)} {...props}>
+    <section className={cn("rounded-2xl border border-foreground/10 bg-card p-4 lg:p-5", className)} {...props}>
       {children}
     </section>
   );
@@ -81,12 +81,12 @@ const CONFETTI: { x: number; y: number; r: number; color: string; delay: number;
   { x: -120, y: 60, r: -200, color: "bg-amber-400", delay: 60, round: true },
   { x: -95, y: -85, r: 320, color: "bg-orange-400", delay: 120 },
   { x: -60, y: 95, r: 180, color: "bg-sky-400", delay: 40 },
-  { x: -40, y: -105, r: -280, color: "bg-white", delay: 160, round: true },
+  { x: -40, y: -105, r: -280, color: "bg-foreground", delay: 160, round: true },
   { x: 40, y: -110, r: 240, color: "bg-primary", delay: 90 },
   { x: 70, y: 90, r: -300, color: "bg-amber-300", delay: 20 },
   { x: 100, y: -75, r: 200, color: "bg-sky-400", delay: 140, round: true },
   { x: 130, y: 45, r: -240, color: "bg-orange-400", delay: 70 },
-  { x: 155, y: -30, r: 300, color: "bg-white", delay: 110 },
+  { x: 155, y: -30, r: 300, color: "bg-foreground", delay: 110 },
   { x: -170, y: 15, r: -160, color: "bg-amber-400", delay: 180 },
   { x: 175, y: 10, r: 220, color: "bg-primary", delay: 30, round: true },
 ];

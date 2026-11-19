@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localizedName } from "@/lib/i18n/names";
+import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { addDays, startOfWeek, toDayKey } from "@/lib/dates";
 import { epley1RM, sessionVolume } from "@/lib/metrics";
 import { suggestNextWeight, type Suggestion } from "@/lib/progression";
-import type { WeightUnit } from "@/lib/units";
 import { loadExerciseSessions } from "@/lib/workout/queries";
 import { countPRExercisesInWorkouts, type ExerciseSession } from "@/lib/workout/records";
 import type { Database } from "@/types/database.types";
@@ -20,14 +21,14 @@ export type ProgressPoint = {
 export type SmartSuggestion = {
   exerciseId: string;
   name: string;
+  /** Група м'язів — для мініатюри. */
+  muscleGroup?: string;
   repMin: number;
   repMax: number;
   suggestion: Suggestion;
 };
 
 export type DashboardData = {
-  displayName: string | null;
-  unit: WeightUnit;
   program: { id: string; name: string } | null;
   today: { id: string; name: string } | null;
   /** Незавершене тренування (кнопка "Continue workout"). */
@@ -56,17 +57,18 @@ export async function getDashboardData(
   supabase: Client,
   userId: string,
   now = new Date(),
+  /** Мова назв системних вправ (name_uk). */
+  locale = "en",
 ): Promise<DashboardData> {
-  const [profileRes, workoutsRes, activeRes] = await Promise.all([
+  const [profileRes, workoutsRes, activeRes, templateNames] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        `display_name, unit,
-         program:programs!profiles_active_program_id_fkey (
+        `program:programs!profiles_active_program_id_fkey (
            id, name,
            program_days ( id, name, position,
              program_exercises ( position, exercise_id, target_sets, rep_min, rep_max,
-               exercises ( name, weight_increment ) )
+               exercises ( name, name_uk, weight_increment, muscle_group ) )
            )
          )`,
       )
@@ -87,8 +89,11 @@ export async function getDashboardData(
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    getTemplateNames(supabase),
   ]);
   if (profileRes.error) throw profileRes.error;
+  // Стандартні назви копій шаблонів і тренувань — мовою інтерфейсу.
+  const tn = (name: string) => templateName(name, templateNames, locale);
   if (workoutsRes.error) throw workoutsRes.error;
   if (activeRes.error) throw activeRes.error;
 
@@ -134,21 +139,19 @@ export async function getDashboardData(
     firstExercise
       ? getProgressPoints(supabase, firstExercise.exercise_id, progressSince).then(
           (points) => ({
-            exerciseName: firstExercise.exercises?.name ?? "Exercise",
+            exerciseName: firstExercise.exercises ? localizedName(firstExercise.exercises, locale) : "—",
             points,
           }),
         )
       : workouts.length > 0
-        ? getMostFrequentExerciseProgress(supabase, progressSince)
+        ? getMostFrequentExerciseProgress(supabase, progressSince, locale)
         : Promise.resolve(null),
   ]);
 
   return {
-    displayName: profile?.display_name ?? null,
-    unit: profile?.unit ?? "kg",
-    program: program ? { id: program.id, name: program.name } : null,
-    today: todayDay ? { id: todayDay.id, name: todayDay.name } : null,
-    activeWorkout: activeRes.data,
+    program: program ? { id: program.id, name: tn(program.name) } : null,
+    today: todayDay ? { id: todayDay.id, name: tn(todayDay.name) } : null,
+    activeWorkout: activeRes.data ? { id: activeRes.data.id, name: tn(activeRes.data.name) } : null,
     week: {
       volumeKg: sessionVolume(weekData.weekSets),
       workouts: thisWeekIds.length,
@@ -157,7 +160,8 @@ export async function getDashboardData(
     smartProgression: buildSmartProgression(
       todayExercises.map((pe) => ({
         exerciseId: pe.exercise_id,
-        name: pe.exercises?.name ?? "Exercise",
+        name: pe.exercises ? localizedName(pe.exercises, locale) : "—",
+        muscleGroup: pe.exercises?.muscle_group,
         repMin: pe.rep_min,
         repMax: pe.rep_max,
         targetSets: pe.target_sets,
@@ -212,6 +216,7 @@ export function buildSmartProgression(
   exercises: {
     exerciseId: string;
     name: string;
+    muscleGroup?: string;
     repMin: number;
     repMax: number;
     targetSets: number;
@@ -232,7 +237,14 @@ export function buildSmartProgression(
       increment: ex.increment,
     });
     if (suggestion.action === "none") continue;
-    result.push({ exerciseId: ex.exerciseId, name: ex.name, repMin: ex.repMin, repMax: ex.repMax, suggestion });
+    result.push({
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      muscleGroup: ex.muscleGroup,
+      repMin: ex.repMin,
+      repMax: ex.repMax,
+      suggestion,
+    });
   }
   return result;
 }
@@ -284,10 +296,10 @@ async function getProgressPoints(
 }
 
 /** Запасний варіант: вправа, що трапляється в найбільшій кількості тренувань. */
-async function getMostFrequentExerciseProgress(supabase: Client, since: string) {
+async function getMostFrequentExerciseProgress(supabase: Client, since: string, locale: string) {
   const { data, error } = await supabase
     .from("workout_sets")
-    .select("exercise_id, workout_id, exercises ( name ), workouts!inner ( status, started_at )")
+    .select("exercise_id, workout_id, exercises ( name, name_uk ), workouts!inner ( status, started_at )")
     .eq("is_completed", true)
     .eq("workouts.status", "completed")
     .gte("workouts.started_at", since)
@@ -298,7 +310,7 @@ async function getMostFrequentExerciseProgress(supabase: Client, since: string) 
   for (const s of data) {
     let entry = workoutsByExercise.get(s.exercise_id);
     if (!entry) {
-      entry = { name: s.exercises?.name ?? "Exercise", ids: new Set() };
+      entry = { name: s.exercises ? localizedName(s.exercises, locale) : "—", ids: new Set() };
       workoutsByExercise.set(s.exercise_id, entry);
     }
     entry.ids.add(s.workout_id);

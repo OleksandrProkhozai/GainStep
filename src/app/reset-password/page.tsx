@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { getTranslations } from "next-intl/server";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
-export const metadata: Metadata = { title: "Reset password · GainStep" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.meta");
+  return { title: t("reset") };
+}
 
 export const viewport: Viewport = {
   viewportFit: "cover",
