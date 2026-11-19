@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
+/** error — код повідомлення (errors.*); текст підставляє клієнт. */
 export type WorkoutActionResult = { error: string };
 
 const idSchema = z.uuid();
@@ -69,9 +70,9 @@ export async function finishWorkout(
   notes: string,
 ): Promise<WorkoutActionResult> {
   const { supabase, userId } = await requireUser();
-  if (!idSchema.safeParse(workoutId).success) return { error: "Workout not found" };
+  if (!idSchema.safeParse(workoutId).success) return { error: "workoutNotFound" };
   const parsedNotes = notesSchema.safeParse(notes.trim());
-  if (!parsedNotes.success) return { error: "Notes are too long (max 2000 characters)" };
+  if (!parsedNotes.success) return { error: "notesTooLong" };
 
   const { data: workout, error: loadError } = await supabase
     .from("workouts")
@@ -81,9 +82,9 @@ export async function finishWorkout(
     .maybeSingle();
   if (loadError) {
     console.error("finishWorkout: load", loadError);
-    return { error: "Couldn't finish the workout. Please try again." };
+    return { error: "workoutFinishFailed" };
   }
-  if (!workout) return { error: "Workout not found" };
+  if (!workout) return { error: "workoutNotFound" };
 
   if (workout.status === "in_progress") {
     const { error: deleteError } = await supabase
@@ -93,7 +94,7 @@ export async function finishWorkout(
       .eq("is_completed", false);
     if (deleteError) {
       console.error("finishWorkout: delete sets", deleteError);
-      return { error: "Couldn't finish the workout. Please try again." };
+      return { error: "workoutFinishFailed" };
     }
 
     const { error: updateError } = await supabase
@@ -106,7 +107,7 @@ export async function finishWorkout(
       .eq("id", workoutId);
     if (updateError) {
       console.error("finishWorkout: update", updateError);
-      return { error: "Couldn't finish the workout. Please try again." };
+      return { error: "workoutFinishFailed" };
     }
   }
 
@@ -124,9 +125,9 @@ export async function updateWorkoutNotes(
   notes: string,
 ): Promise<NotesActionResult> {
   const { supabase, userId } = await requireUser();
-  if (!idSchema.safeParse(workoutId).success) return { ok: false, error: "Workout not found" };
+  if (!idSchema.safeParse(workoutId).success) return { ok: false, error: "workoutNotFound" };
   const parsed = notesSchema.safeParse(typeof notes === "string" ? notes.trim() : "");
-  if (!parsed.success) return { ok: false, error: "Notes are too long (max 2000 characters)" };
+  if (!parsed.success) return { ok: false, error: "notesTooLong" };
 
   const { data, error } = await supabase
     .from("workouts")
@@ -137,9 +138,9 @@ export async function updateWorkoutNotes(
     .select("id");
   if (error) {
     console.error("updateWorkoutNotes", error);
-    return { ok: false, error: "Couldn't save the note. Please try again." };
+    return { ok: false, error: "noteSaveFailed" };
   }
-  if (data.length === 0) return { ok: false, error: "Workout not found" };
+  if (data.length === 0) return { ok: false, error: "workoutNotFound" };
 
   revalidatePath(`/workout/${workoutId}/summary`);
   return { ok: true, notes: parsed.data };
@@ -154,7 +155,7 @@ export async function discardWorkout(
   redirectTo: "/" | "/workouts" = "/",
 ): Promise<WorkoutActionResult> {
   const { supabase, userId } = await requireUser();
-  if (!idSchema.safeParse(workoutId).success) return { error: "Workout not found" };
+  if (!idSchema.safeParse(workoutId).success) return { error: "workoutNotFound" };
 
   const { error } = await supabase
     .from("workouts")
@@ -164,7 +165,7 @@ export async function discardWorkout(
     .eq("status", "in_progress");
   if (error) {
     console.error("discardWorkout", error);
-    return { error: "Couldn't discard the workout. Please try again." };
+    return { error: "workoutDiscardFailed" };
   }
 
   const target = redirectTo === "/workouts" ? "/workouts" : "/";

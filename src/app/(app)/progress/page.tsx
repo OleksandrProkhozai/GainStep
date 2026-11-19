@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { ProgressView } from "@/components/progress/progress-view";
 import { RecordsCard } from "@/components/progress/records-card";
 import { WeeklyVolumeCard } from "@/components/progress/weekly-volume-card";
+import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getProgressData } from "@/lib/progress/queries";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Progress · GainStep" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("progress");
+  return { title: t("title") };
+}
 
 /**
  * Прогрес: динаміка вибраної вправи (робоча вага / оцінка 1ПМ),
@@ -17,9 +22,9 @@ export const metadata: Metadata = { title: "Progress · GainStep" };
 export default async function ProgressPage({ searchParams }: PageProps<"/progress">) {
   const user = await getCurrentUser();
   if (!user.onboarded) redirect("/onboarding");
-  const supabase = await createClient();
+  const [supabase, locale] = await Promise.all([createClient(), getLocale()]);
   const now = new Date();
-  const [data, params] = await Promise.all([getProgressData(supabase, user.id, now), searchParams]);
+  const [data, params] = await Promise.all([getProgressData(supabase, user.id, now, locale), searchParams]);
 
   const requested = typeof params.exercise === "string" ? params.exercise : null;
   const initialExerciseId =
@@ -27,12 +32,11 @@ export default async function ProgressPage({ searchParams }: PageProps<"/progres
 
   return (
     <ProgressView
-      unit={data.unit}
       exercises={data.exercises}
       initialExerciseId={initialExerciseId}
       now={now.getTime()}
-      records={<RecordsCard records={data.records} unit={data.unit} now={now.getTime()} />}
-      volume={<WeeklyVolumeCard weeks={data.weeklyVolume} unit={data.unit} />}
+      records={<RecordsCard records={data.records} unit={user.unit} now={now.getTime()} />}
+      volume={<WeeklyVolumeCard weeks={data.weeklyVolume} />}
       bodyWeight={data.bodyWeight}
     />
   );

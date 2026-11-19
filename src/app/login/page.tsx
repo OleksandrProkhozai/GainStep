@@ -1,10 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
+import { getTranslations } from "next-intl/server";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthForm } from "@/components/auth/auth-form";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata: Metadata = { title: "Sign in · GainStep" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("auth.meta");
+  return { title: t("signIn") };
+}
 
 // viewport-fit=cover — щоб env(safe-area-inset-*) працював на iPhone
 export const viewport: Viewport = {

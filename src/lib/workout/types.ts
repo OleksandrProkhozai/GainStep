@@ -1,5 +1,4 @@
 import type { PersonalBest, Session } from "@/lib/progression";
-import type { WeightUnit } from "@/lib/units";
 import type { Enums } from "@/types/database.types";
 
 export type MuscleGroup = Enums<"muscle_group">;
@@ -9,6 +8,12 @@ export type Equipment = Enums<"equipment_type">;
 export interface WorkoutExercise {
   exerciseId: string;
   name: string;
+  /**
+   * Українська назва системної вправи. Зберігається в Zustand разом з name,
+   * тож після зміни мови назва перемикається без перезавантаження тренування
+   * (старі збережені стани без поля показують name).
+   */
+  nameUk?: string | null;
   muscleGroup: MuscleGroup;
   equipment: Equipment;
   /** Крок ваги вправи, кг (exercises.weight_increment). */
@@ -62,7 +67,6 @@ export interface WorkoutInit {
   programName: string | null;
   startedAt: string;
   notes: string;
-  unit: WeightUnit;
   exercises: WorkoutExercise[];
   savedSets: SavedSet[];
 }

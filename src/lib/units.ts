@@ -2,6 +2,32 @@ import type { Enums } from "@/types/database.types";
 
 export type WeightUnit = Enums<"weight_unit">;
 
+/** Мова форматування чисел ("en" | "uk"); рядок — щоб units.ts не залежав від i18n. */
+export type NumberLocale = string;
+
+const formatters = new Map<string, Intl.NumberFormat>();
+
+/** Кешований Intl.NumberFormat: "62.5" (en) / "62,5" (uk). */
+export function numberFormat(locale: NumberLocale, maximumFractionDigits = 1, useGrouping = true) {
+  const key = `${locale}|${maximumFractionDigits}|${useGrouping}`;
+  let fmt = formatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(locale, { maximumFractionDigits, useGrouping });
+    formatters.set(key, fmt);
+  }
+  return fmt;
+}
+
+/** Число з до 1 знаку після коми в мові інтерфейсу. */
+export function formatNumber(value: number, locale: NumberLocale = "en") {
+  return numberFormat(locale).format(value);
+}
+
+/** Підпис одиниці: uk — "кг", lb лишається lb. */
+export function unitLabel(unit: WeightUnit, locale: NumberLocale = "en") {
+  return unit === "kg" && locale === "uk" ? "кг" : unit;
+}
+
 /** Точне значення: 1 lb = 0.45359237 kg. */
 export const KG_PER_LB = 0.45359237;
 
@@ -20,35 +46,26 @@ export function toDisplayWeight(kg: number, unit: WeightUnit) {
   return roundToHalf(kgToUnit(kg, unit));
 }
 
-const weightFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 1,
-});
-
-/** "62.5 kg" / "137.5 lb". */
-export function formatWeight(kg: number, unit: WeightUnit) {
-  return `${weightFormat.format(toDisplayWeight(kg, unit))} ${unit}`;
+/** "62.5 kg" / "137.5 lb"; uk — "62,5 кг". */
+export function formatWeight(kg: number, unit: WeightUnit, locale: NumberLocale = "en") {
+  return `${formatNumber(toDisplayWeight(kg, unit), locale)} ${unitLabel(unit, locale)}`;
 }
 
 /**
  * Тоннаж для карток статистики: тисячі скорочуються як k.
- * 12 400 → "12.4k", 980 → "980". Одиниця повертається окремо,
- * щоб її можна було стилізувати дрібнішим шрифтом.
+ * 12 400 → "12.4k" (uk: "12,4k"), 980 → "980". Одиниця повертається
+ * окремо (уже перекладена), щоб її можна було стилізувати дрібнішим шрифтом.
  */
-export function formatVolume(kg: number, unit: WeightUnit) {
+export function formatVolume(kg: number, unit: WeightUnit, locale: NumberLocale = "en") {
   const value = kgToUnit(kg, unit);
   const text =
     value >= 1000
-      ? `${weightFormat.format(Math.round(value / 100) / 10)}k`
+      ? `${formatNumber(Math.round(value / 100) / 10, locale)}k`
       : String(Math.round(value));
-  return { value: text, unit };
+  return { value: text, unit: unitLabel(unit, locale) };
 }
 
 // ───────────── Поля вводу ваги (екран тренування) ─────────────
-
-const inputFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 2,
-  useGrouping: false,
-});
 
 /**
  * Значення для поля вводу ваги. Для кг — до 0.01 (диски 1.25 кг
@@ -61,14 +78,24 @@ export function toInputWeight(kg: number, unit: WeightUnit) {
     : Math.round(kg * 100) / 100;
 }
 
-/** "62.5" / "135" — вага без одиниць для таблиць і полів. */
-export function formatWeightValue(kg: number, unit: WeightUnit) {
-  return inputFormat.format(toInputWeight(kg, unit));
+/** "62.5" / "135" (uk: "62,5") — вага без одиниць для таблиць і полів. */
+export function formatWeightValue(kg: number, unit: WeightUnit, locale: NumberLocale = "en") {
+  return numberFormat(locale, 2, false).format(toInputWeight(kg, unit));
 }
 
 /** Число в одиницях користувача → кг (як зберігаємо в базі). */
 export function fromDisplayWeight(value: number, unit: WeightUnit) {
   return unit === "lb" ? value * KG_PER_LB : value;
+}
+
+/**
+ * Значення з поля вводу (в одиницях користувача) → кг без дрейфу.
+ * Якщо поле показує те саме, що й originalKg, повертаємо originalKg:
+ * 62.5 kg показується як 138 lb, і без змін має лишитись 62.5, а не 62.6.
+ */
+export function inputToKg(value: number, unit: WeightUnit, originalKg?: number | null) {
+  if (originalKg != null && value === toInputWeight(originalKg, unit)) return originalKg;
+  return fromDisplayWeight(value, unit);
 }
 
 /**
@@ -80,3 +107,19 @@ export function weightStep(incrementKg: number, unit: WeightUnit) {
   if (unit === "kg") return incrementKg;
   return incrementKg < 2.5 ? 2.5 : 5;
 }
+
+/** Усі форматери ваги для конкретних одиниць і мови (клієнт: useWeightFormat). */
+export function createWeightFormat(unit: WeightUnit, locale: NumberLocale) {
+  return {
+    unit,
+    locale,
+    /** "кг" / "kg" / "lb". */
+    unitLabel: unitLabel(unit, locale),
+    weight: (kg: number) => formatWeight(kg, unit, locale),
+    value: (kg: number) => formatWeightValue(kg, unit, locale),
+    volume: (kg: number) => formatVolume(kg, unit, locale),
+    number: (value: number) => formatNumber(value, locale),
+  };
+}
+
+export type WeightFormat = ReturnType<typeof createWeightFormat>;

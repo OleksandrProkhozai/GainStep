@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database.types";
+import { compatFetch } from "./compat-fetch";
 
 /**
  * Supabase-клієнт для Server Components, Server Actions і Route Handlers.
@@ -13,6 +14,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: compatFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll();

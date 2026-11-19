@@ -5,7 +5,7 @@
  */
 
 import { cleanFloat } from "@/lib/metrics";
-import { KG_PER_LB, kgToUnit, type WeightUnit } from "@/lib/units";
+import { fromDisplayWeight, kgToUnit, type WeightUnit } from "@/lib/units";
 
 export type BodyWeightEntry = {
   /** "YYYY-MM-DD". */
@@ -28,10 +28,11 @@ export type ParseResult = { ok: true; value: number } | { ok: false; error: stri
 export function validateBodyWeight(value: number, unit: WeightUnit): ParseResult {
   const { min, max } = BODY_WEIGHT_LIMITS[unit];
   if (!Number.isFinite(value) || value < min || value > max) {
-    return { ok: false, error: `Enter a weight between ${min} and ${max} ${unit}` };
+    // Межі (min/max/unit) клієнт підставляє з BODY_WEIGHT_LIMITS.
+    return { ok: false, error: "weightRange" };
   }
   if (Math.abs(Math.round(value * 10) - value * 10) > 1e-6) {
-    return { ok: false, error: "Use at most one decimal place" };
+    return { ok: false, error: "weightOneDecimal" };
   }
   return { ok: true, value: Math.round(value * 10) / 10 };
 }
@@ -39,11 +40,11 @@ export function validateBodyWeight(value: number, unit: WeightUnit): ParseResult
 /** Розбирає текст поля ("73,4" теж приймається). */
 export function parseBodyWeightInput(text: string, unit: WeightUnit): ParseResult {
   const trimmed = text.trim();
-  if (!trimmed) return { ok: false, error: "Enter your weight" };
+  if (!trimmed) return { ok: false, error: "weightRequired" };
   if (!INPUT_PATTERN.test(trimmed)) {
     return /[.,]\d{2,}$/.test(trimmed)
-      ? { ok: false, error: "Use at most one decimal place" }
-      : { ok: false, error: "Enter a number, e.g. 73.4" };
+      ? { ok: false, error: "weightOneDecimal" }
+      : { ok: false, error: "weightNotNumber" };
   }
   return validateBodyWeight(Number(trimmed.replace(",", ".")), unit);
 }
@@ -55,7 +56,7 @@ export function toBodyUnit(kg: number, unit: WeightUnit): number {
 
 /** Значення в одиницях користувача → кг для бази (numeric(5,2)). */
 export function bodyWeightToKg(value: number, unit: WeightUnit): number {
-  const kg = unit === "lb" ? value * KG_PER_LB : value;
+  const kg = fromDisplayWeight(value, unit);
   return Math.round(kg * 100) / 100;
 }
 

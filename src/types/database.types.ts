@@ -46,6 +46,7 @@ export type Database = {
           is_compound: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          name_uk: string | null
           owner_id: string | null
           weight_increment: number
         }
@@ -57,6 +58,7 @@ export type Database = {
           is_compound?: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
+          name_uk?: string | null
           owner_id?: string | null
           weight_increment?: number
         }
@@ -68,6 +70,7 @@ export type Database = {
           is_compound?: boolean
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
+          name_uk?: string | null
           owner_id?: string | null
           weight_increment?: number
         }
@@ -77,10 +80,12 @@ export type Database = {
         Row: {
           active_program_id: string | null
           created_at: string
+          default_rest_seconds: number
           display_name: string | null
           experience: Database["public"]["Enums"]["experience_level"] | null
           goal: Database["public"]["Enums"]["training_goal"] | null
           id: string
+          locale: string
           onboarded_at: string | null
           unit: Database["public"]["Enums"]["weight_unit"]
           updated_at: string
@@ -88,10 +93,12 @@ export type Database = {
         Insert: {
           active_program_id?: string | null
           created_at?: string
+          default_rest_seconds?: number
           display_name?: string | null
           experience?: Database["public"]["Enums"]["experience_level"] | null
           goal?: Database["public"]["Enums"]["training_goal"] | null
           id: string
+          locale?: string
           onboarded_at?: string | null
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
@@ -99,10 +106,12 @@ export type Database = {
         Update: {
           active_program_id?: string | null
           created_at?: string
+          default_rest_seconds?: number
           display_name?: string | null
           experience?: Database["public"]["Enums"]["experience_level"] | null
           goal?: Database["public"]["Enums"]["training_goal"] | null
           id?: string
+          locale?: string
           onboarded_at?: string | null
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
@@ -121,18 +130,21 @@ export type Database = {
         Row: {
           id: string
           name: string
+          name_uk: string | null
           position: number
           program_id: string
         }
         Insert: {
           id?: string
           name: string
+          name_uk?: string | null
           position: number
           program_id: string
         }
         Update: {
           id?: string
           name?: string
+          name_uk?: string | null
           position?: number
           program_id?: string
         }
@@ -201,6 +213,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          name_uk: string | null
           owner_id: string | null
           source_template_id: string | null
           updated_at: string
@@ -211,6 +224,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          name_uk?: string | null
           owner_id?: string | null
           source_template_id?: string | null
           updated_at?: string
@@ -221,6 +235,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          name_uk?: string | null
           owner_id?: string | null
           source_template_id?: string | null
           updated_at?: string
@@ -335,9 +350,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_default_rest: {
+        Args: { p_seconds: number }
+        Returns: number
+      }
       clone_program: {
-        Args: { template_id: string }
+        Args: { p_locale?: string; template_id: string }
         Returns: string
+      }
+      delete_my_account: {
+        Args: never
+        Returns: undefined
+      }
+      save_program: {
+        Args: { p_program_id: string; p_payload: Json }
+        Returns: undefined
       }
     }
     Enums: {

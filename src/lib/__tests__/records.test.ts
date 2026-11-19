@@ -8,7 +8,7 @@ import {
   hasPR,
   type ExerciseSession,
 } from "../workout/records";
-import { formatSuggestionReason } from "../workout/suggestion-text";
+import { suggestionReason } from "../workout/suggestion-text";
 
 const done = (weight: number, reps: number): SetResult => ({ weight, reps, isCompleted: true });
 const sets = (weight: number, ...reps: number[]) => reps.map((r) => done(weight, r));
@@ -72,13 +72,12 @@ describe("countPRExercisesInWorkouts", () => {
   });
 });
 
-describe("formatSuggestionReason", () => {
+describe("suggestionReason", () => {
   const range = { repMin: 8, repMax: 12 };
-  it("один текст для кожної дії, незалежно від одиниць", () => {
-    expect(formatSuggestionReason({ action: "increase" }, range, "kg")).toBe("All sets reached 12 reps");
-    expect(formatSuggestionReason({ action: "same" }, range, "lb")).toBe("Reach 12 reps on all sets first");
-    expect(formatSuggestionReason({ action: "deload" }, range, "kg")).toBe("Below 8 reps two sessions in a row");
-    expect(formatSuggestionReason({ action: "none" }, range, "kg")).toBe("No history yet — pick a starting weight");
+  it("ключ = дія алгоритму, значення — межі діапазону (текст — у messages)", () => {
+    for (const action of ["increase", "same", "deload", "none"] as const) {
+      expect(suggestionReason({ action }, range)).toEqual({ key: action, values: range });
+    }
   });
 });
 

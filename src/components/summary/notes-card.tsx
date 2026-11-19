@@ -2,7 +2,9 @@
 
 import { useRef, useState, useTransition } from "react";
 import { Loader2, NotebookPen, Pencil, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
 import { cn } from "@/lib/utils";
 import { updateWorkoutNotes } from "@/lib/workout/actions";
 import { Card, CardTitle, pill } from "./parts";
@@ -22,6 +24,9 @@ export function NotesCard({
   const [notes, setNotes] = useState(initialNotes);
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
+  const t = useTranslations("summary.notes");
+  const tc = useTranslations("common");
+  const errorText = useErrorText();
   const editRef = useRef<HTMLButtonElement>(null);
   const editing = draft !== null;
 
@@ -35,12 +40,12 @@ export function NotesCard({
     startSaving(async () => {
       const result = await updateWorkoutNotes(workoutId, draft);
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(errorText(result.error));
         return;
       }
       setNotes(result.notes);
       setDraft(null);
-      toast.success("Note saved");
+      toast.success(t("saved"));
       requestAnimationFrame(() => editRef.current?.focus());
     });
   };
@@ -49,15 +54,15 @@ export function NotesCard({
     <Card className={className} aria-labelledby="notes-heading">
       <div className="flex items-center justify-between gap-3">
         <CardTitle id="notes-heading" icon={<NotebookPen className="size-5 text-foreground/85" aria-hidden />}>
-          Notes
+          {t("title")}
         </CardTitle>
         {!editing && notes && (
           <button
             ref={editRef}
             type="button"
             onClick={() => setDraft(notes)}
-            aria-label="Edit note"
-            className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+            aria-label={t("edit")}
+            className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Pencil className="size-4" aria-hidden />
           </button>
@@ -73,7 +78,7 @@ export function NotesCard({
           }}
         >
           <label htmlFor="summary-notes" className="sr-only">
-            Workout note
+            {t("label")}
           </label>
           <textarea
             id="summary-notes"
@@ -86,8 +91,8 @@ export function NotesCard({
             maxLength={MAX_NOTES}
             rows={3}
             autoFocus
-            placeholder="How did it feel?"
-            className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3.5 py-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/20"
+            placeholder={t("placeholder")}
+            className="w-full resize-none rounded-xl border border-foreground/10 bg-background/70 px-3.5 py-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/20"
           />
           <div className="mt-2 flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground tabular-nums">
@@ -98,9 +103,9 @@ export function NotesCard({
                 type="button"
                 onClick={cancel}
                 disabled={saving}
-                className={cn(pill, "h-10 px-4 text-sm hover:bg-white/5 disabled:opacity-40")}
+                className={cn(pill, "h-10 px-4 text-sm hover:bg-foreground/5 disabled:opacity-40")}
               >
-                Cancel
+                {tc("cancel")}
               </button>
               <button
                 type="submit"
@@ -108,7 +113,7 @@ export function NotesCard({
                 className={cn(pill, "h-10 bg-primary px-5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60")}
               >
                 {saving && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                Save
+                {tc("save")}
               </button>
             </div>
           </div>
@@ -123,7 +128,7 @@ export function NotesCard({
           className="mt-2 inline-flex items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
         >
           <Plus className="size-4" aria-hidden />
-          Add a note
+          {t("add")}
         </button>
       )}
     </Card>

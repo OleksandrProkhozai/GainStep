@@ -1,7 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { useTranslations } from "next-intl";
+import { useDateFns } from "@/components/i18n/use-format";
 import { History, Plus, Scale } from "lucide-react";
 import {
   Area,
@@ -20,9 +22,11 @@ import {
   weightDomain,
   type BodyWeightEntry,
 } from "@/lib/progress/body-weight";
+import { useChartColors } from "@/components/charts/use-chart-colors";
+import { useUnit } from "@/components/preferences/preferences-provider";
 import type { WeightUnit } from "@/lib/units";
 import { LogWeightDialog } from "./log-weight-dialog";
-import { AXIS_TICK, CARD_BG, Card, CardTitle, Delta, GRID_STROKE, LIME, formatNumber, signed } from "./parts";
+import { Card, CardTitle, Delta, useProgressFormat } from "./parts";
 import { WeightHistory } from "./weight-history";
 
 type Point = { t: number; value: number };
@@ -34,15 +38,19 @@ type Point = { t: number; value: number };
  */
 export function BodyWeightCard({
   entries,
-  unit,
   periodFrom,
 }: {
   /** Усі записи, від старих до нових. */
   entries: BodyWeightEntry[];
-  unit: WeightUnit;
   /** Початок вибраного періоду, мс; null — уся історія. */
   periodFrom: number | null;
 }) {
+  const unit = useUnit();
+  const t = useTranslations("progress.bodyWeight");
+  const pf = useProgressFormat();
+  const fmtDate = useDateFns();
+  const unitText = pf.unit(unit);
+  const colors = useChartColors();
   const [log, setLog] = useState<{ open: boolean; date: string | null }>({ open: false, date: null });
   const [historyOpen, setHistoryOpen] = useState(false);
   const gradientId = useId();
@@ -60,25 +68,25 @@ export function BodyWeightCard({
   return (
     <Card className="flex flex-col">
       <header className="flex items-center justify-between gap-2">
-        <CardTitle>Body weight</CardTitle>
+        <CardTitle>{t("title")}</CardTitle>
         <div className="flex items-center gap-1">
           {entries.length > 0 && (
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+              className="inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               <History className="size-3.5" aria-hidden />
-              History
+              {t("history")}
             </button>
           )}
           <button
             type="button"
             onClick={() => openLog(null)}
-            className="inline-flex h-8 items-center gap-1 rounded-full border border-white/15 px-3 text-xs font-semibold transition-colors hover:bg-white/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+            className="inline-flex h-8 items-center gap-1 rounded-full border border-foreground/15 px-3 text-xs font-semibold transition-colors hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Plus className="size-3.5" aria-hidden />
-            Log weight
+            {t("log")}
           </button>
         </div>
       </header>
@@ -86,25 +94,25 @@ export function BodyWeightCard({
       {latest && (
         <div className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <p className="font-heading text-2xl font-extrabold tracking-tight md:text-[28px]">
-            {formatNumber(toBodyUnit(latest.weightKg, unit))}
-            <span className="ml-1 text-sm font-semibold text-muted-foreground">{unit}</span>
+            {pf.number(toBodyUnit(latest.weightKg, unit))}
+            <span className="ml-1 text-sm font-semibold text-muted-foreground">{unitText}</span>
           </p>
           {delta !== null && since && (
             <span className="inline-flex items-baseline gap-1.5">
-              <Delta value={delta} text={`${signed(delta)} ${unit}`} zeroText={`= 0 ${unit}`} neutralDown />
-              <span className="text-xs text-muted-foreground">vs {format(parseISO(since), "MMM d")}</span>
+              <Delta value={delta} text={`${pf.signed(delta)} ${unitText}`} zeroText={`= 0 ${unitText}`} neutralDown />
+              <span className="text-xs text-muted-foreground">{t("vs", { date: fmtDate(parseISO(since), "short") })}</span>
             </span>
           )}
         </div>
       )}
 
       {points.length < 2 ? (
-        <div className="mt-3 flex min-h-[140px] flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-5 py-5 text-center">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+        <div className="mt-3 flex min-h-[140px] flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-foreground/10 px-5 py-5 text-center">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/12 text-accent-text">
             <Scale className="size-5" aria-hidden />
           </span>
           <p className="mt-2.5 max-w-[240px] text-sm text-muted-foreground">
-            Log your weight on different days to see the trend
+            {t("empty")}
           </p>
         </div>
       ) : (
@@ -113,18 +121,18 @@ export function BodyWeightCard({
             <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} accessibilityLayer>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={LIME} stopOpacity={0.24} />
-                  <stop offset="100%" stopColor={LIME} stopOpacity={0} />
+                  <stop offset="0%" stopColor={colors.fill} stopOpacity={0.24} />
+                  <stop offset="100%" stopColor={colors.fill} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke={GRID_STROKE} vertical={false} />
+              <CartesianGrid stroke={colors.grid} vertical={false} />
               <XAxis
                 dataKey="t"
                 type="number"
                 scale="time"
                 domain={["dataMin", "dataMax"]}
-                tickFormatter={(t: number) => format(t, "MMM d")}
-                tick={{ ...AXIS_TICK, fontSize: 10 }}
+                tickFormatter={(time: number) => fmtDate(time, "short")}
+                tick={{ fill: colors.tick, fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -135,25 +143,25 @@ export function BodyWeightCard({
                 dataKey="value"
                 domain={domain}
                 allowDecimals={false}
-                tick={{ ...AXIS_TICK, fontSize: 10 }}
+                tick={{ fill: colors.tick, fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 width={30}
                 tickCount={3}
               />
               <Tooltip
-                cursor={{ stroke: "rgb(255 255 255 / 0.2)", strokeWidth: 1 }}
+                cursor={{ stroke: colors.cursor, strokeWidth: 1 }}
                 content={(props) => <WeightTooltip {...props} unit={unit} />}
               />
               <Area
                 type="monotone"
                 dataKey="value"
-                name="Body weight"
-                stroke={LIME}
+                name={t("title")}
+                stroke={colors.line}
                 strokeWidth={2}
                 fill={`url(#${gradientId})`}
-                dot={{ r: 3, fill: LIME, stroke: CARD_BG, strokeWidth: 1.5 }}
-                activeDot={{ r: 5, fill: LIME, stroke: CARD_BG, strokeWidth: 2 }}
+                dot={{ r: 3, fill: colors.line, stroke: colors.surface, strokeWidth: 1.5 }}
+                activeDot={{ r: 5, fill: colors.line, stroke: colors.surface, strokeWidth: 2 }}
                 isAnimationActive={false}
               />
             </AreaChart>
@@ -165,14 +173,12 @@ export function BodyWeightCard({
         open={log.open}
         onOpenChange={(open) => setLog((s) => ({ ...s, open }))}
         entries={entries}
-        unit={unit}
         initialDate={log.date}
       />
       <WeightHistory
         open={historyOpen}
         onOpenChange={setHistoryOpen}
         entries={entries}
-        unit={unit}
         onEdit={(date) => {
           setHistoryOpen(false);
           openLog(date);
@@ -183,13 +189,15 @@ export function BodyWeightCard({
 }
 
 function WeightTooltip({ active, payload, unit }: TooltipContentProps & { unit: WeightUnit }) {
+  const pf = useProgressFormat();
+  const fmtDate = useDateFns();
   const point = payload?.[0]?.payload as Point | undefined;
   if (!active || !point) return null;
   return (
-    <div className="rounded-xl border border-white/10 bg-[#1b1c20]/95 px-3 py-2 shadow-xl shadow-black/40 backdrop-blur">
-      <p className="text-[11px] text-muted-foreground">{format(point.t, "EEE, MMM d")}</p>
+    <div className="rounded-xl border border-foreground/10 bg-popover/95 px-3 py-2 shadow-xl shadow-black/40 backdrop-blur">
+      <p className="text-[11px] text-muted-foreground">{fmtDate(point.t, "weekday")}</p>
       <p className="mt-0.5 font-heading text-base font-bold text-foreground">
-        {formatNumber(point.value)} {unit}
+        {pf.number(point.value)} {pf.unit(unit)}
       </p>
     </div>
   );

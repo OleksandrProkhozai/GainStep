@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import type { Viewport } from "next";
+import { UserPreferences } from "@/components/preferences/user-preferences";
 
 // viewport-fit=cover — щоб env(safe-area-inset-*) працював на iPhone
 export const viewport: Viewport = {
@@ -12,6 +14,10 @@ export const viewport: Viewport = {
  */
 export default function WorkoutLayout({ children }: LayoutProps<"/workout">) {
   return (
-    <div className="dark flex min-h-dvh flex-1 flex-col bg-background text-foreground">{children}</div>
+    <div className="flex min-h-dvh flex-1 flex-col bg-background text-foreground">
+      <Suspense>
+        <UserPreferences>{children}</UserPreferences>
+      </Suspense>
+    </div>
   );
 }

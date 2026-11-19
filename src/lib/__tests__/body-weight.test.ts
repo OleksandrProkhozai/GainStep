@@ -19,7 +19,7 @@ describe("parseBodyWeightInput", () => {
   });
 
   it("відхиляє більше одного знаку після коми", () => {
-    expect(parseBodyWeightInput("73.45", "kg")).toMatchObject({ ok: false, error: "Use at most one decimal place" });
+    expect(parseBodyWeightInput("73.45", "kg")).toMatchObject({ ok: false, error: "weightOneDecimal" });
   });
 
   it("відхиляє порожнє поле і не числа", () => {
@@ -31,7 +31,7 @@ describe("parseBodyWeightInput", () => {
   it("межі: 30–300 kg, 66–660 lb", () => {
     expect(parseBodyWeightInput("30", "kg").ok).toBe(true);
     expect(parseBodyWeightInput("300", "kg").ok).toBe(true);
-    expect(parseBodyWeightInput("29.9", "kg")).toMatchObject({ ok: false, error: "Enter a weight between 30 and 300 kg" });
+    expect(parseBodyWeightInput("29.9", "kg")).toMatchObject({ ok: false, error: "weightRange" });
     expect(parseBodyWeightInput("300.1", "kg").ok).toBe(false);
     expect(parseBodyWeightInput("66", "lb").ok).toBe(true);
     expect(parseBodyWeightInput("660", "lb").ok).toBe(true);

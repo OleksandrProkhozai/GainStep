@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
+import { authErrorCode } from "@/lib/auth/errors";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleIcon } from "./google-icon";
 
 export function GoogleButton({ disabled }: { disabled?: boolean }) {
+  const t = useTranslations("auth");
+  const errorText = useErrorText();
   const [pending, setPending] = useState(false);
 
   async function handleClick() {
@@ -19,7 +24,7 @@ export function GoogleButton({ disabled }: { disabled?: boolean }) {
     });
     // При успіху браузер іде на Google, тож pending лишаємо.
     if (error) {
-      toast.error(error.message);
+      toast.error(errorText(authErrorCode(error)));
       setPending(false);
     }
   }
@@ -37,7 +42,7 @@ export function GoogleButton({ disabled }: { disabled?: boolean }) {
       ) : (
         <GoogleIcon className="size-5" />
       )}
-      Continue with Google
+      {t("google")}
     </Button>
   );
 }

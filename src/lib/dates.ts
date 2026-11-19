@@ -6,6 +6,24 @@
 
 export const USER_TIME_ZONE = "Europe/Kiev";
 
+/** BCP 47 для Intl: en — британський порядок дат ("17 Nov"), uk — українська. */
+export function intlLocale(locale: string) {
+  return locale === "uk" ? "uk-UA" : "en-GB";
+}
+
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** Кешований Intl.DateTimeFormat у поясі користувача і мові інтерфейсу. */
+export function dateFormat(locale: string, options: Intl.DateTimeFormatOptions) {
+  const key = locale + JSON.stringify(options);
+  let fmt = dateFormatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(intlLocale(locale), { timeZone: USER_TIME_ZONE, ...options });
+    dateFormatters.set(key, fmt);
+  }
+  return fmt;
+}
+
 const dayKeyFormatters = new Map<string, Intl.DateTimeFormat>();
 
 /** Календарна дата моменту `date` у поясі `timeZone`: "YYYY-MM-DD". */
@@ -46,7 +64,8 @@ export function startOfWeek(key: string) {
 }
 
 /** Тривалість для показу: "52 min" / "1 h 05 min". */
-export function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+export function formatMinutes(minutes: number, locale = "en") {
+  const [h, m] = locale === "uk" ? ["год", "хв"] : ["h", "m"];
+  if (minutes < 60) return locale === "uk" ? `${minutes} ${m}` : `${minutes} min`;
+  return `${Math.floor(minutes / 60)}${locale === "uk" ? " " : ""}${h} ${String(minutes % 60).padStart(2, "0")}${locale === "uk" ? " " : ""}${m}`;
 }

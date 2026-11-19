@@ -6,7 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
 import { signIn, signUp, type ActionResult } from "@/lib/auth/actions";
 import {
   signInSchema,
@@ -19,37 +21,43 @@ import { IconInput, PasswordInput } from "./form-fields";
 import { GoogleButton } from "./google-button";
 import { SubmitButton } from "./submit-button";
 
-function handleResult(result: ActionResult | undefined) {
-  if (!result) return;
-  if ("error" in result) toast.error(result.error);
-  else toast.success(result.message);
+/** Тост результату дії: коди → текст мовою інтерфейсу. */
+function useResultToast() {
+  const t = useTranslations("auth.messages");
+  const errorText = useErrorText();
+  return (result: ActionResult | undefined) => {
+    if (!result) return;
+    if ("error" in result) toast.error(errorText(result.error));
+    else toast.success(t(result.message));
+  };
 }
 
 /** Форма входу/реєстрації; режим перемикається через ?mode=signup. */
 export function AuthForm() {
+  const t = useTranslations("auth");
   const searchParams = useSearchParams();
   const isSignUp = searchParams.get("mode") === "signup";
   const callbackError = searchParams.get("error");
 
   useEffect(() => {
     if (callbackError) {
-      toast.error("Authentication failed. Please try again.");
+      toast.error(t("callbackFailed"));
     }
-  }, [callbackError]);
+  }, [callbackError, t]);
 
   return (
     <>
       {isSignUp ? (
         <AuthHeader
-          title="Create"
-          accent="account"
-          subtitle="Start tracking your progress"
+          title={t("signUp.title")}
+          accent={t("signUp.accent")}
+          subtitle={t("signUp.subtitle")}
         />
       ) : (
         <AuthHeader
-          title="Welcome"
-          accent="back!"
-          subtitle="Sign in to continue"
+          title={t("signIn.title")}
+          accent={t("signIn.accent")}
+          subtitle={t("signIn.subtitle")}
         />
       )}
 
@@ -59,6 +67,9 @@ export function AuthForm() {
 }
 
 function SignInForm() {
+  const t = useTranslations("auth");
+  const errorText = useErrorText();
+  const handleResult = useResultToast();
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -88,16 +99,17 @@ function SignInForm() {
       <form onSubmit={onSubmit} noValidate className="space-y-3 md:space-y-4">
         <IconInput
           icon={Mail}
-          label="Email address"
+          label={t("email")}
           type="email"
           autoComplete="email"
-          error={errors.email?.message}
+          error={errorText(errors.email?.message)}
           {...register("email")}
         />
         <div className="space-y-1.5 md:space-y-2">
           <PasswordInput
+            label={t("password")}
             autoComplete="current-password"
-            error={errors.password?.message}
+            error={errorText(errors.password?.message)}
             {...register("password")}
           />
           <div className="flex justify-end">
@@ -105,23 +117,23 @@ function SignInForm() {
               href="/forgot-password"
               className="pr-2 text-[13px] font-medium text-[#c6f432] hover:underline"
             >
-              Forgot password?
+              {t("forgotLink")}
             </Link>
           </div>
         </div>
-        <SubmitButton pending={pending}>Sign in</SubmitButton>
+        <SubmitButton pending={pending}>{t("signIn.submit")}</SubmitButton>
       </form>
 
       <OrDivider />
       <GoogleButton disabled={pending} />
 
       <p className="mt-4 text-center text-sm text-white/55 md:mt-6 md:text-[15px]">
-        Don&apos;t have an account?{" "}
+        {t("noAccount")}{" "}
         <Link
           href="/login?mode=signup"
           className="font-semibold text-[#c6f432] hover:underline"
         >
-          Sign up
+          {t("signUp.link")}
         </Link>
       </p>
     </>
@@ -129,6 +141,9 @@ function SignInForm() {
 }
 
 function SignUpForm() {
+  const t = useTranslations("auth");
+  const errorText = useErrorText();
+  const handleResult = useResultToast();
   const [pending, startTransition] = useTransition();
   const {
     register,
@@ -148,36 +163,37 @@ function SignUpForm() {
       <form onSubmit={onSubmit} noValidate className="space-y-3 md:space-y-4">
         <IconInput
           icon={Mail}
-          label="Email address"
+          label={t("email")}
           type="email"
           autoComplete="email"
-          error={errors.email?.message}
+          error={errorText(errors.email?.message)}
           {...register("email")}
         />
         <PasswordInput
+          label={t("password")}
           autoComplete="new-password"
-          error={errors.password?.message}
+          error={errorText(errors.password?.message)}
           {...register("password")}
         />
         <PasswordInput
-          label="Confirm password"
+          label={t("confirmPassword")}
           autoComplete="new-password"
-          error={errors.confirmPassword?.message}
+          error={errorText(errors.confirmPassword?.message)}
           {...register("confirmPassword")}
         />
-        <SubmitButton pending={pending}>Sign up</SubmitButton>
+        <SubmitButton pending={pending}>{t("signUp.submit")}</SubmitButton>
       </form>
 
       <OrDivider />
       <GoogleButton disabled={pending} />
 
       <p className="mt-4 text-center text-sm text-white/55 md:mt-6 md:text-[15px]">
-        Already have an account?{" "}
+        {t("haveAccount")}{" "}
         <Link
           href="/login"
           className="font-semibold text-[#c6f432] hover:underline"
         >
-          Sign in
+          {t("signIn.link")}
         </Link>
       </p>
     </>
@@ -185,10 +201,11 @@ function SignUpForm() {
 }
 
 function OrDivider() {
+  const t = useTranslations("auth");
   return (
     <div className="my-4 flex items-center gap-4 text-sm text-white/45 md:my-6">
       <span className="h-px flex-1 bg-white/10" />
-      or
+      {t("or")}
       <span className="h-px flex-1 bg-white/10" />
     </div>
   );

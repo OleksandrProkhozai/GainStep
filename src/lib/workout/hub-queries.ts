@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localizedName } from "@/lib/i18n/names";
+import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { pickNextDay } from "@/lib/dashboard/queries";
 import { sessionVolume } from "@/lib/metrics";
-import type { WeightUnit } from "@/lib/units";
 import type { Database } from "@/types/database.types";
 
 type Client = SupabaseClient<Database>;
@@ -30,7 +31,6 @@ export type HubRecent = {
 };
 
 export type WorkoutsHubData = {
-  unit: WeightUnit;
   program: { id: string; name: string; days: HubDay[] } | null;
   active: { id: string; name: string; startedAt: string } | null;
   recent: HubRecent[];
@@ -46,16 +46,17 @@ export type WorkoutsHubData = {
 export async function getWorkoutsHubData(
   supabase: Client,
   userId: string,
+  /** Мова назв системних вправ (name_uk). */
+  locale = "en",
 ): Promise<WorkoutsHubData> {
-  const [profileRes, activeRes, recentRes] = await Promise.all([
+  const [profileRes, activeRes, recentRes, templateNames] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        `unit,
-         program:programs!profiles_active_program_id_fkey (
+        `program:programs!profiles_active_program_id_fkey (
            id, name,
            program_days ( id, name, position,
-             program_exercises ( position, exercises ( name ) )
+             program_exercises ( position, exercises ( name, name_uk ) )
            )
          )`,
       )
@@ -76,7 +77,10 @@ export async function getWorkoutsHubData(
       .eq("status", "completed")
       .order("started_at", { ascending: false })
       .limit(RECENT_LIMIT),
+    getTemplateNames(supabase),
   ]);
+  // Стандартні назви копій шаблонів і тренувань — мовою інтерфейсу.
+  const tn = (name: string) => templateName(name, templateNames, locale);
   if (profileRes.error) throw profileRes.error;
   if (activeRes.error) throw activeRes.error;
   if (recentRes.error) throw recentRes.error;
@@ -121,33 +125,32 @@ export async function getWorkoutsHubData(
   const nextDay = pickNextDay(days, lastProgramRes.data);
 
   return {
-    unit: profileRes.data?.unit ?? "kg",
     program: program
       ? {
           id: program.id,
-          name: program.name,
+          name: tn(program.name),
           days: days.map((d) => {
             const exercises = [...d.program_exercises].sort((a, b) => a.position - b.position);
             return {
               id: d.id,
-              name: d.name,
+              name: tn(d.name),
               exerciseCount: exercises.length,
               preview: exercises
                 .slice(0, PREVIEW_EXERCISES)
-                .map((e) => e.exercises?.name ?? "Exercise"),
+                .map((e) => (e.exercises ? localizedName(e.exercises, locale) : "—")),
               isNext: d.id === nextDay?.id,
             };
           }),
         }
       : null,
     active: activeRes.data
-      ? { id: activeRes.data.id, name: activeRes.data.name, startedAt: activeRes.data.started_at }
+      ? { id: activeRes.data.id, name: tn(activeRes.data.name), startedAt: activeRes.data.started_at }
       : null,
     recent: recentRes.data.map((w) => {
       const sets = setsByWorkout.get(w.id) ?? [];
       return {
         id: w.id,
-        name: w.name,
+        name: tn(w.name),
         startedAt: w.started_at,
         finishedAt: w.finished_at,
         volumeKg: sessionVolume(sets),

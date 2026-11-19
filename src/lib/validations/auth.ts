@@ -1,15 +1,15 @@
-import { z } from "zod";
+import { z } from "@/lib/validations/zod-codes";
 
 const email = z
   .string()
   .trim()
-  .min(1, { error: "Email is required" })
-  .pipe(z.email({ error: "Enter a valid email address" }));
+  .min(1, { error: "emailRequired" })
+  .pipe(z.email({ error: "emailInvalid" }));
 
 const password = z
   .string()
-  .min(8, { error: "Password must be at least 8 characters" })
-  .max(72, { error: "Password must be at most 72 characters" });
+  .min(8, { error: "passwordMin" })
+  .max(72, { error: "passwordMax" });
 
 export const signInSchema = z.object({
   email,
@@ -23,7 +23,7 @@ export const signUpSchema = z
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    error: "Passwords do not match",
+    error: "passwordsMismatch",
     path: ["confirmPassword"],
   });
 
@@ -35,7 +35,7 @@ export const resetPasswordSchema = z
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    error: "Passwords do not match",
+    error: "passwordsMismatch",
     path: ["confirmPassword"],
   });
 

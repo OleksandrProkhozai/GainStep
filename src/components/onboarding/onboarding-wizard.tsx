@@ -10,13 +10,16 @@ import {
   Loader2,
   Settings,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useErrorText } from "@/components/i18n/use-error-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { completeOnboarding } from "@/lib/onboarding/actions";
 import { cn } from "@/lib/utils";
-import { bodyWeightStepSchema } from "@/lib/validations/onboarding";
+import { unitLabel } from "@/lib/units";
+import { bodyWeightStepSchema, WEIGHT_LIMITS } from "@/lib/validations/onboarding";
 import type { Enums } from "@/types/database.types";
 import {
   LevelCard,
@@ -31,9 +34,11 @@ import {
   primaryPillClass,
   rovingTabIndex,
 } from "./onboarding-ui";
+import { ProgramThumb } from "@/components/programs/program-thumb";
 
 export type ProgramTemplate = {
   id: string;
+  /** Уже мовою інтерфейсу (name_uk для uk). */
   name: string;
   days_per_week: number;
 };
@@ -45,29 +50,12 @@ type Goal = Enums<"training_goal">;
 /** Вибір програми: id шаблону або Custom (без програми). */
 const CUSTOM = "custom";
 
-const UNIT_OPTIONS = [
-  { value: "kg", label: "kg" },
-  { value: "lb", label: "lb" },
-] as const;
-
-const GOAL_OPTIONS = [
-  { value: "strength", label: "Strength" },
-  { value: "hypertrophy", label: "Mass" },
-] as const;
+const UNITS = ["kg", "lb"] as const;
+const GOALS = ["strength", "hypertrophy"] as const;
 
 const LEVELS = [
-  {
-    value: "beginner",
-    title: "Beginner",
-    description: "Up to 1 year of training",
-    icon: BicepsFlexed,
-  },
-  {
-    value: "intermediate",
-    title: "Intermediate",
-    description: "1+ years of training",
-    icon: ChartNoAxesColumnIncreasing,
-  },
+  { value: "beginner", icon: BicepsFlexed },
+  { value: "intermediate", icon: ChartNoAxesColumnIncreasing },
 ] as const;
 
 /**
@@ -82,6 +70,12 @@ export function OnboardingWizard({
 }: {
   templates: ProgramTemplate[];
 }) {
+  const t = useTranslations("onboarding");
+  const te = useTranslations("common.enums");
+  const locale = useLocale();
+  const errorText = useErrorText();
+  const UNIT_OPTIONS = UNITS.map((u) => ({ value: u, label: unitLabel(u, locale) }));
+  const GOAL_OPTIONS = GOALS.map((g) => ({ value: g, label: te(`goal.${g}`) }));
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
 
@@ -98,7 +92,7 @@ export function OnboardingWizard({
   const weightCheck = bodyWeightStepSchema.safeParse({ weight, unit });
   const weightError =
     weightTouched && !weightCheck.success
-      ? weightCheck.error.issues[0]?.message
+      ? errorText(weightCheck.error.issues[0]?.message, { ...WEIGHT_LIMITS[unit], unit: unitLabel(unit, locale) })
       : undefined;
 
   // Розділи для десктопного степера; kg і Strength мають значення за замовчуванням.
@@ -117,17 +111,19 @@ export function OnboardingWizard({
         : program !== null;
 
   const programOptions = [
-    ...templates.map((t) => ({
-      id: t.id,
-      title: t.name,
-      description: `${t.days_per_week} days/week`,
+    ...templates.map((tpl) => ({
+      id: tpl.id,
+      title: tpl.name,
+      description: t("daysPerWeek", { count: tpl.days_per_week }),
       icon: Dumbbell,
+      program: { id: tpl.id, name: tpl.name },
     })),
     {
       id: CUSTOM,
-      title: "Custom",
-      description: "I'll set it up later",
+      title: t("custom.title"),
+      description: t("custom.description"),
       icon: Settings,
+      program: null,
     },
   ];
 
@@ -164,7 +160,7 @@ export function OnboardingWizard({
         today: format(new Date(), "yyyy-MM-dd"),
       });
       // Успіх завершується редіректом; сюди доходимо лише з помилкою.
-      if (result?.error) toast.error(result.error);
+      if (result?.error) toast.error(errorText(result.error, { ...WEIGHT_LIMITS[unit], unit: unitLabel(unit, locale) }));
     });
   }
 
@@ -208,16 +204,16 @@ export function OnboardingWizard({
               <>
                 <StepHeading
                   ref={headingRef}
-                  title="Tell us about you"
-                  subtitle="We'll use it to track your progress."
+                  title={t("step1.title")}
+                  subtitle={t("step1.subtitle")}
                 />
                 <div className="md:max-w-md">
-                  <div className="rounded-3xl border border-white/10 bg-secondary/40 p-4 md:p-5">
+                  <div className="rounded-3xl border border-foreground/10 bg-secondary/40 p-4 md:p-5">
                     <Label
                       htmlFor="body-weight"
                       className="pl-1 text-[15px] font-medium text-foreground"
                     >
-                      Body weight
+                      {t("bodyWeight")}
                     </Label>
                     <WeightField
                       id="body-weight"
@@ -227,7 +223,7 @@ export function OnboardingWizard({
                     />
                   </div>
                   <SegmentedControl
-                    aria-label="Weight unit"
+                    aria-label={t("weightUnit")}
                     value={unit}
                     options={UNIT_OPTIONS}
                     onChange={changeUnit}
@@ -241,24 +237,24 @@ export function OnboardingWizard({
               <>
                 <StepHeading
                   ref={headingRef}
-                  title="What's your level?"
-                  subtitle="Help us set up the best experience for you."
+                  title={t("step2.title")}
+                  subtitle={t("step2.subtitle")}
                 />
                 <div className="md:grid md:grid-cols-[minmax(0,1.35fr)_1px_minmax(0,1fr)] md:gap-10">
                   <LevelGroup
-                    label="Training experience"
+                    label={t("experience")}
                     value={experience}
                     onChange={setExperience}
                   />
 
-                  <span aria-hidden className="hidden bg-white/10 md:block" />
+                  <span aria-hidden className="hidden bg-foreground/10 md:block" />
 
                   <div className="mt-8 md:mt-0">
                     <h2
                       id="training-focus"
                       className="mb-3 font-heading text-xl font-bold text-foreground md:text-2xl"
                     >
-                      Training focus?
+                      {t("focus")}
                     </h2>
                     <SegmentedControl
                       aria-labelledby="training-focus"
@@ -273,10 +269,10 @@ export function OnboardingWizard({
 
             {step === 3 && (
               <>
-                <StepHeading ref={headingRef} title="Choose a starter program." />
+                <StepHeading ref={headingRef} title={t("step3.title")} />
                 <div
                   role="radiogroup"
-                  aria-label="Starter program"
+                  aria-label={t("starterProgram")}
                   onKeyDown={handleRadioKeys}
                   className="grid gap-3 md:grid-cols-2 md:gap-4"
                 >
@@ -284,6 +280,7 @@ export function OnboardingWizard({
                     <ProgramCard
                       key={item.id}
                       icon={item.icon}
+                      media={item.program && <ProgramThumb program={item.program} size="md" />}
                       title={item.title}
                       description={item.description}
                       selected={program === item.id}
@@ -313,7 +310,7 @@ export function OnboardingWizard({
                 onClick={() => goTo(step - 1)}
                 className={cn(outlinePillClass, "flex-1 md:w-40 md:flex-none")}
               >
-                Back
+                {t("back")}
               </Button>
             )}
             <Button
@@ -322,7 +319,7 @@ export function OnboardingWizard({
               aria-busy={pending}
               className={cn(primaryPillClass, "flex-1 md:w-44 md:flex-none")}
             >
-              {isLast ? "Let's go" : "Next"}
+              {isLast ? t("letsGo") : t("next")}
               <SubmitIcon pending={pending} />
             </Button>
           </div>
@@ -337,13 +334,13 @@ export function OnboardingWizard({
         <div className="grid grid-cols-[minmax(0,1.25fr)_1px_minmax(0,1fr)] gap-10">
           <section>
             <h1 className="font-heading text-[30px] leading-tight font-extrabold tracking-tight text-foreground">
-              What&apos;s your level?
+              {t("step2.title")}
             </h1>
             <p className="mt-1 text-[15px] text-muted-foreground">
-              Help us set up the best experience for you
+              {t("step2.subtitle")}
             </p>
             <LevelGroup
-              label="Training experience"
+              label={t("experience")}
               value={experience}
               onChange={setExperience}
               className="mt-5 gap-4"
@@ -351,12 +348,12 @@ export function OnboardingWizard({
             />
           </section>
 
-          <span aria-hidden className="bg-white/10" />
+          <span aria-hidden className="bg-foreground/10" />
 
           <div className="space-y-4">
             <div>
               <Label htmlFor="body-weight-lg" className={desktopLabelClass}>
-                Body weight
+                {t("bodyWeight")}
               </Label>
               <WeightField
                 id="body-weight-lg"
@@ -366,7 +363,7 @@ export function OnboardingWizard({
             </div>
             <div>
               <h2 id="unit-system-lg" className={desktopLabelClass}>
-                Unit system?
+                {t("unitSystem")}
               </h2>
               <SegmentedControl
                 aria-labelledby="unit-system-lg"
@@ -378,7 +375,7 @@ export function OnboardingWizard({
             </div>
             <div>
               <h2 id="training-focus-lg" className={desktopLabelClass}>
-                Training focus?
+                {t("focus")}
               </h2>
               <SegmentedControl
                 aria-labelledby="training-focus-lg"
@@ -393,7 +390,7 @@ export function OnboardingWizard({
 
         <section className="mt-6">
           <h2 id="starter-program-lg" className={desktopLabelClass}>
-            Choose a starter program:
+            {t("step3.titleDesktop")}
           </h2>
           <div
             role="radiogroup"
@@ -405,6 +402,7 @@ export function OnboardingWizard({
               <ProgramTile
                 key={item.id}
                 icon={item.icon}
+                media={item.program && <ProgramThumb program={item.program} size="sm" />}
                 title={item.title}
                 description={item.description}
                 selected={program === item.id}
@@ -422,7 +420,7 @@ export function OnboardingWizard({
         <div className="mt-6 flex items-center justify-end gap-5">
           {!allComplete && (
             <p id="complete-hint-lg" className="text-sm text-muted-foreground">
-              Complete all sections to continue
+              {t("completeAll")}
             </p>
           )}
           <Button
@@ -433,7 +431,7 @@ export function OnboardingWizard({
             aria-describedby={allComplete ? undefined : "complete-hint-lg"}
             className={cn(primaryPillClass, "w-44")}
           >
-            Let&apos;s go
+            {t("letsGo")}
             <SubmitIcon pending={pending} />
           </Button>
         </div>
@@ -467,6 +465,8 @@ function LevelGroup({
   className?: string;
   cardClassName?: string;
 }) {
+  const t = useTranslations("onboarding.levels");
+  const te = useTranslations("common.enums.experience");
   return (
     <div
       role="radiogroup"
@@ -478,8 +478,8 @@ function LevelGroup({
         <LevelCard
           key={level.value}
           icon={level.icon}
-          title={level.title}
-          description={level.description}
+          title={te(level.value)}
+          description={t(level.value)}
           selected={value === level.value}
           tabIndex={rovingTabIndex(value === level.value, index, value !== null)}
           onSelect={() => onChange(level.value)}
@@ -511,6 +511,7 @@ function WeightField({
   inputClassName?: string;
 }) {
   const errorId = `${id}-error`;
+  const locale = useLocale();
   return (
     <div className={className}>
       <div className="relative">
@@ -527,7 +528,7 @@ function WeightField({
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
           className={cn(
-            "h-14 rounded-full border-white/10 bg-background/60 pr-16 pl-6 font-bold text-foreground placeholder:text-foreground/25 focus-visible:border-primary focus-visible:ring-primary/20 dark:bg-background/60",
+            "h-14 rounded-full border-foreground/10 bg-background/60 pr-16 pl-6 font-bold text-foreground placeholder:text-foreground/25 focus-visible:border-primary focus-visible:ring-primary/20 dark:bg-background/60",
             inputClassName,
           )}
         />
@@ -535,7 +536,7 @@ function WeightField({
           aria-hidden
           className="pointer-events-none absolute top-1/2 right-6 -translate-y-1/2 text-lg font-medium text-muted-foreground"
         >
-          {unit}
+          {unitLabel(unit, locale)}
         </span>
       </div>
       {error && (

@@ -1,10 +1,11 @@
+import { useTranslations } from "next-intl";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Заглушка екрана підсумку: ті самі картки й порядок, що й на сторінці. */
 export function SummarySkeleton() {
   const card = "rounded-2xl";
   return (
-    <div className="flex min-h-dvh flex-col" aria-busy="true" aria-label="Loading workout summary">
+    <div className="flex min-h-dvh flex-col" aria-busy="true" aria-label={useTranslations("common.loading")("summary")}>
       <div className="flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:px-6 lg:pt-5">
         <Skeleton className="hidden h-8 w-36 lg:block" />
         <Skeleton className="ml-auto size-10 rounded-full" />

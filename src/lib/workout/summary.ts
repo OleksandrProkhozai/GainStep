@@ -26,6 +26,8 @@ import { countPRExercises, type ExercisePRInput } from "./records";
 export interface SummaryExerciseInput {
   exerciseId: string;
   name: string;
+  /** Група м'язів — для мініатюри. */
+  muscleGroup?: string;
   repMin: number;
   repMax: number;
   targetSets: number;
@@ -83,6 +85,7 @@ export interface SummaryRecord {
 export interface SummaryExercise {
   exerciseId: string;
   name: string;
+  muscleGroup?: string;
   repMin: number;
   repMax: number;
   /** Лише виконані підходи. */
@@ -170,6 +173,7 @@ export function buildWorkoutSummary(input: SummaryInput): WorkoutSummary {
     exercises.push({
       exerciseId: ex.exerciseId,
       name: ex.name,
+      muscleGroup: ex.muscleGroup,
       repMin: ex.repMin,
       repMax: ex.repMax,
       sets,
