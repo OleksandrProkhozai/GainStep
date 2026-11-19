@@ -2,7 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { useWeightFormat } from "@/components/i18n/use-format";
+import { useMinRest } from "@/components/preferences/preferences-provider";
 import { cn } from "@/lib/utils";
+import { effectiveRest } from "@/lib/workout/rest";
 import { useWorkout } from "./context";
 import { formatRest, useNow } from "./hooks";
 import { useCurrentExercise, useNextSet } from "./use-workout-view";
@@ -96,7 +98,9 @@ export function RestCard() {
   const t = useTranslations("workout.rest");
   const nextLabel = useNextLabel();
   const current = useCurrentExercise();
-  const idleText = formatRest((current?.exercise.restSeconds ?? 0) * 1000);
+  const minRest = useMinRest();
+  // Поки таймер не йде — відпочинок поточної вправи з урахуванням мінімуму.
+  const idleText = formatRest(current ? effectiveRest(current.exercise.restSeconds, minRest) * 1000 : 0);
 
   return (
     <section className="rounded-2xl border border-foreground/10 bg-card p-5">

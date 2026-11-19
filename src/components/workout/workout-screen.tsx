@@ -6,10 +6,11 @@ import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { exerciseName } from "@/lib/i18n/names";
 import { useStore } from "zustand";
-import { useUnit } from "@/components/preferences/preferences-provider";
+import { useMinRest, useUnit } from "@/components/preferences/preferences-provider";
 import { createClient } from "@/lib/supabase/client";
 import { discardWorkout, finishWorkout } from "@/lib/workout/actions";
 import { firstPending } from "@/lib/workout/derive";
+import { effectiveRest } from "@/lib/workout/rest";
 import { createWorkoutStore, purgeOtherWorkouts, type WorkoutStore } from "@/lib/workout/store";
 import { createSyncer } from "@/lib/workout/sync";
 import type { WorkoutInit } from "@/lib/workout/types";
@@ -52,6 +53,9 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   // Одиниці — з налаштувань (не зі store): зміна unit одразу міняє показ,
   // а store і далі тримає кг.
   const unit = useUnit();
+  // Мінімальний відпочинок читається в момент старту таймера: якщо його
+  // змінили в Settings під час тренування, наступний відпочинок — уже з новим.
+  const minRest = useMinRest();
   const t = useTranslations("workout");
   const locale = useLocale();
   const errorText = useErrorText();
@@ -117,7 +121,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       }
       const exercise = store.getState().complete(clientId, Date.now());
       if (!exercise) return;
-      store.getState().startRest(exercise.restSeconds, Date.now());
+      store.getState().startRest(effectiveRest(exercise.restSeconds, minRest), Date.now());
       if (!firstPending(store.getState().sets, exercise.exerciseId)) {
         const { exercises, currentIndex } = store.getState();
         const next = exercises[currentIndex + 1];
@@ -128,7 +132,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
         }
       }
     },
-    [store, t, locale],
+    [store, t, locale, minRest],
   );
 
   const finish = useCallback(() => {

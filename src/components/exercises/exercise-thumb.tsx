@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { muscleImage } from "@/lib/exercises/muscles";
+import { exerciseThumbSrc } from "@/lib/exercises/images";
 import { cn } from "@/lib/utils";
 import { MuscleTile } from "./muscle-tile";
 
@@ -13,10 +13,11 @@ const PX: Record<Exclude<ThumbSize, "lg">, number> = { sm: 36, md: 48 };
 
 /**
  * Мініатюра вправи. Пріоритет:
- *   1) exercise.imagePath — власне фото вправи (колонки image_path у базі
- *      поки немає; поле зарезервоване);
- *   2) картинка групи м'язів з public/muscles;
- *   3) MuscleTile з кодом групи — якщо картинка не завантажилась.
+ *   1) exercise.imagePath — фото вправи з bucket exercise-images (public URL);
+ *   2) власна вправа без фото — /exercises/custom-default.webp;
+ *   3) картинка групи м'язів з public/muscles;
+ *   4) MuscleTile з кодом групи — якщо картинка не завантажилась.
+ * Фото з Supabase Storage вже стиснуте (512×512 webp) — без оптимізації Next.
  * Розміри: sm 36, md 48, lg — квадрат на всю ширину батька.
  */
 export function ExerciseThumb({
@@ -24,14 +25,15 @@ export function ExerciseThumb({
   size = "md",
   className,
 }: {
-  exercise: { muscleGroup: string; imagePath?: string | null };
+  exercise: { muscleGroup: string; imagePath?: string | null; custom?: boolean };
   size?: ThumbSize;
   className?: string;
 }) {
   const tm = useTranslations("common.enums.muscle");
   const [failed, setFailed] = useState<string | null>(null);
 
-  const src = exercise.imagePath || muscleImage(exercise.muscleGroup);
+  const src = exerciseThumbSrc(exercise);
+  const remote = src.startsWith("http");
   const key = exercise.muscleGroup as Parameters<typeof tm>[0];
   const alt = tm.has(key) ? tm(key) : exercise.muscleGroup;
 
@@ -57,6 +59,7 @@ export function ExerciseThumb({
           fill
           sizes="(min-width: 1280px) 220px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
           className="object-cover"
+          unoptimized={remote}
           onError={() => setFailed(src)}
         />
       </span>
@@ -71,6 +74,7 @@ export function ExerciseThumb({
       width={px}
       height={px}
       className={cn(frame, size === "sm" ? "size-9" : "size-12", className)}
+      unoptimized={remote}
       onError={() => setFailed(src)}
     />
   );

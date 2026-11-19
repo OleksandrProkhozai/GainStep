@@ -65,7 +65,8 @@ export function countPRExercisesInWorkouts(
   return total;
 }
 
-function mergeBest(a: PersonalBest | null, b: PersonalBest | null): PersonalBest | null {
+/** Об'єднання найкращих показників (історія + ще одне тренування). */
+export function mergeBest(a: PersonalBest | null, b: PersonalBest | null): PersonalBest | null {
   if (!a) return b;
   if (!b) return a;
   return {

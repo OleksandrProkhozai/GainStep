@@ -27,9 +27,10 @@ describe("profilePatchSchema (updateProfile)", () => {
     expect(profilePatchSchema.safeParse({ unit: "stone" }).success).toBe(false);
   });
 
-  it("таймер: ціле, 0–600, кратне 15", () => {
-    for (const ok of [0, 15, 90, 600]) expect(profilePatchSchema.safeParse({ defaultRestSeconds: ok }).success).toBe(true);
-    for (const bad of [-15, 615, 100, 90.5]) expect(profilePatchSchema.safeParse({ defaultRestSeconds: bad }).success).toBe(false);
+  it("мінімальний відпочинок: ціле, 0–300, кратне 15", () => {
+    for (const ok of [0, 15, 90, 300]) expect(profilePatchSchema.safeParse({ minRestSeconds: ok }).success).toBe(true);
+    for (const bad of [-15, 315, 600, 100, 90.5]) expect(profilePatchSchema.safeParse({ minRestSeconds: bad }).success).toBe(false);
+    expect(profilePatchSchema.safeParse({ minRestSeconds: 315 }).error?.issues[0]?.message).toBe("minRestRange");
   });
 
   it("порожній patch і зайві ключі відхиляються", () => {
@@ -38,17 +39,17 @@ describe("profilePatchSchema (updateProfile)", () => {
   });
 
   it("toProfileColumns пише лише передані поля", () => {
-    expect(toProfileColumns({ defaultRestSeconds: 120 })).toEqual({ default_rest_seconds: 120 });
+    expect(toProfileColumns({ minRestSeconds: 120 })).toEqual({ min_rest_seconds: 120 });
     expect(toProfileColumns({ displayName: "Olek", unit: "lb" })).toEqual({ display_name: "Olek", unit: "lb" });
   });
 });
 
-describe("степер таймера відпочинку", () => {
-  it("крок 15 с у межах 0:00–10:00", () => {
+describe("степер мінімального відпочинку", () => {
+  it("крок 15 с у межах 0:00–5:00", () => {
     expect(stepRest(90, 1)).toBe(105);
     expect(stepRest(90, -1)).toBe(75);
     expect(stepRest(REST_LIMITS.min, -1)).toBe(0);
-    expect(stepRest(REST_LIMITS.max, 1)).toBe(600);
+    expect(stepRest(REST_LIMITS.max, 1)).toBe(300);
     expect(stepRest(100, 1)).toBe(120); // 100 → вирівнюється до 105, далі +15
   });
 

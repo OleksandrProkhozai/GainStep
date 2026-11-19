@@ -6,12 +6,14 @@ import { getTranslations } from "next-intl/server";
 import { getRequestLocale } from "@/i18n/locale";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "@/lib/validations/zod-codes";
+import { isOwnImagePath, newImagePath } from "@/lib/images/storage";
+import { PROGRAM_IMAGES_BUCKET } from "./images";
 import { firstIssue, programNameSchema, saveProgramSchema } from "./schema";
 
 /** error — код повідомлення (errors.*); текст підставляє клієнт. */
 export type ProgramActionResult = { ok: true } | { ok: false; error: string };
 
-const idSchema = z.uuid();
+const idSchema = z.guid();
 
 async function requireUser() {
   const supabase = await createClient();
@@ -27,6 +29,47 @@ function revalidatePrograms(programId?: string) {
   if (programId) revalidatePath(`/programs/${programId}`);
   revalidatePath("/");
   revalidatePath("/workouts");
+}
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Прибрати фото програми з bucket (заміна, видалення). Не критично — лише лог. */
+async function removeProgramImage(supabase: Supabase, path: string | null | undefined) {
+  if (!path) return;
+  const { error } = await supabase.storage.from(PROGRAM_IMAGES_BUCKET).remove([path]);
+  if (error) console.error("removeProgramImage", error);
+}
+
+/**
+ * Фото власної програми: шлях з папки користувача в bucket або null
+ * (картинка за замовчуванням). Попереднє фото прибирається з bucket.
+ */
+export async function setProgramImage(programId: string, imagePath: string | null): Promise<ProgramActionResult> {
+  const { supabase, userId } = await requireUser();
+  if (!idSchema.safeParse(programId).success) return { ok: false, error: "programNotFound" };
+  if (imagePath !== null && !isOwnImagePath(imagePath, userId)) return { ok: false, error: "programImageInvalid" };
+
+  const { data: previous } = await supabase
+    .from("programs")
+    .select("image_path")
+    .eq("id", programId)
+    .eq("owner_id", userId)
+    .maybeSingle();
+  if (!previous) return { ok: false, error: "programNotFound" };
+
+  const { error } = await supabase
+    .from("programs")
+    .update({ image_path: imagePath })
+    .eq("id", programId)
+    .eq("owner_id", userId);
+  if (error) {
+    console.error("setProgramImage", error);
+    return { ok: false, error: "programImageFailed" };
+  }
+  if (previous.image_path !== imagePath) await removeProgramImage(supabase, previous.image_path);
+
+  revalidatePrograms(programId);
+  return { ok: true };
 }
 
 /** Робить програму активною, якщо в користувача активної ще немає. */
@@ -170,7 +213,7 @@ export async function duplicateProgram(programId: string): Promise<{ ok: false; 
 
   const { data: source } = await supabase
     .from("programs")
-    .select("name")
+    .select("name, image_path")
     .eq("id", programId)
     .eq("owner_id", userId)
     .maybeSingle();
@@ -183,7 +226,15 @@ export async function duplicateProgram(programId: string): Promise<{ ok: false; 
   }
   const t = await getTranslations("programs");
   const name = t("copyName", { name: source.name.slice(0, 50) });
-  await supabase.from("programs").update({ name }).eq("id", newId);
+  // Фото — окремою копією файлу: видалення однієї програми не зачепить іншу.
+  let image_path: string | null = null;
+  if (source.image_path) {
+    const copy = newImagePath(userId, crypto.randomUUID(), source.image_path.endsWith(".jpg") ? "jpg" : "webp");
+    const { error: copyError } = await supabase.storage.from(PROGRAM_IMAGES_BUCKET).copy(source.image_path, copy);
+    if (copyError) console.error("duplicateProgram: image", copyError);
+    else image_path = copy;
+  }
+  await supabase.from("programs").update({ name, image_path }).eq("id", newId);
 
   revalidatePrograms(newId);
   redirect(`/programs/${newId}`);
@@ -203,12 +254,13 @@ export async function deleteProgram(programId: string): Promise<{ ok: false; err
     .delete()
     .eq("id", programId)
     .eq("owner_id", userId)
-    .select("id");
+    .select("id, image_path");
   if (error) {
     console.error("deleteProgram", error);
     return { ok: false, error: "programDeleteFailed" };
   }
   if (data.length === 0) return { ok: false, error: "programNotFound" };
+  await removeProgramImage(supabase, data[0].image_path);
 
   revalidatePrograms();
   redirect("/programs");

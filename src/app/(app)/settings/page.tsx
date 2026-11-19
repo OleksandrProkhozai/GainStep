@@ -22,7 +22,7 @@ export default async function SettingsPage() {
         experience: user.experience,
         goal: user.goal,
         unit: user.unit,
-        defaultRestSeconds: user.defaultRestSeconds,
+        minRestSeconds: user.minRestSeconds,
         locale: await getLocale(),
       }}
     />

@@ -6,13 +6,14 @@ import type { WeightUnit } from "@/lib/units";
 /** Налаштування, потрібні клієнтським компонентам. Джерело — getCurrentUser(). */
 export interface ClientPreferences {
   unit: WeightUnit;
-  defaultRestSeconds: number;
+  /** Мінімальний відпочинок, с (0 — вимкнено). */
+  minRestSeconds: number;
 }
 
 const PreferencesContext = createContext<Promise<ClientPreferences> | null>(null);
 
 /**
- * Єдине клієнтське джерело unit і таймера відпочинку. Layout передає
+ * Єдине клієнтське джерело unit і мінімального відпочинку. Layout передає
  * promise (не чекаючи його), а компоненти розгортають його через use()
  * у своїх Suspense-межах. Після збереження налаштувань router.refresh()
  * перерендерює layout з новим promise — усі екрани бачать нове значення.
@@ -38,7 +39,11 @@ export function useUnit(): WeightUnit {
   return usePreferences().unit;
 }
 
-/** Таймер відпочинку для нових вправ, с. */
-export function useDefaultRest(): number {
-  return usePreferences().defaultRestSeconds;
+/**
+ * Мінімальний відпочинок з налаштувань, с (0 — вимкнено). Застосовується
+ * через effectiveRest() при показі й у таймері; після зміни в Settings
+ * router.refresh() дає новий promise, тож наступний відпочинок — з новим мінімумом.
+ */
+export function useMinRest(): number {
+  return usePreferences().minRestSeconds;
 }

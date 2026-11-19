@@ -26,8 +26,8 @@ export type ExerciseHistory = { history: Session[]; best: PersonalBest | null };
 export type HistoryCutoff = {
   /** Лише тренування, що почалися не пізніше (started_at ≤). */
   startedAtOrBefore: string;
-  /** Тренування, яке з історії виключаємо (саме поточне). */
-  excludeWorkoutId: string;
+  /** Тренування, яке з історії виключаємо (саме поточне); без нього — нічого не виключаємо. */
+  excludeWorkoutId?: string;
 };
 
 /**
@@ -51,9 +51,8 @@ export async function loadExerciseSessions(
     .in("exercise_id", exerciseIds)
     .eq("workouts.status", "completed");
   if (cutoff) {
-    query = query
-      .lte("workouts.started_at", cutoff.startedAtOrBefore)
-      .neq("workout_id", cutoff.excludeWorkoutId);
+    query = query.lte("workouts.started_at", cutoff.startedAtOrBefore);
+    if (cutoff.excludeWorkoutId) query = query.neq("workout_id", cutoff.excludeWorkoutId);
   }
   const { data, error } = await query
     .order("workouts(started_at)", { ascending: false })
@@ -104,6 +103,8 @@ type ExerciseRow = {
   muscle_group: MuscleGroup;
   equipment: Equipment;
   weight_increment: number;
+  image_path: string | null;
+  owner_id: string | null;
 };
 
 /** Рядок exercises + параметри дня → вправа тренування (поки без історії). */
@@ -119,13 +120,15 @@ export function toWorkoutExercise(
     muscleGroup: exercise.muscle_group,
     equipment: exercise.equipment,
     increment: Number(exercise.weight_increment),
+    imagePath: exercise.image_path,
+    custom: exercise.owner_id !== null,
     ...params,
     history: history?.history ?? [],
     best: history?.best ?? null,
   };
 }
 
-const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment";
+const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, image_path, owner_id";
 
 export type LoadWorkoutResult =
   | { kind: "ok"; data: WorkoutInit }
@@ -142,8 +145,6 @@ export async function loadWorkout(
   supabase: Client,
   workoutId: string,
   userId: string,
-  /** Відпочинок для вправ, доданих під час тренування (профіль користувача). */
-  defaultRestSeconds: number = ADDED_EXERCISE_DEFAULTS.restSeconds,
   /** Мова стандартних назв шаблонів (назва тренування, програми). */
   locale = "en",
 ): Promise<LoadWorkoutResult> {
@@ -204,7 +205,7 @@ export async function loadWorkout(
   for (const s of setsRes.data) {
     if (!s.exercise || seen.has(s.exercise.id)) continue;
     seen.add(s.exercise.id);
-    ordered.push({ exercise: s.exercise, params: { ...ADDED_EXERCISE_DEFAULTS, restSeconds: defaultRestSeconds } });
+    ordered.push({ exercise: s.exercise, params: { ...ADDED_EXERCISE_DEFAULTS } });
   }
 
   const history = await loadExerciseHistory(supabase, [...seen]);

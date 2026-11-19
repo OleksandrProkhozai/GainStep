@@ -18,7 +18,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { ExercisePicker } from "@/components/exercises/exercise-picker";
-import { useDefaultRest } from "@/components/preferences/preferences-provider";
+import { useMinRest } from "@/components/preferences/preferences-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,6 +38,7 @@ import {
   type DraftExercise,
 } from "@/lib/programs/draft";
 import { nextChip } from "@/lib/programs/next";
+import { effectiveRest } from "@/lib/workout/rest";
 import type { ProgramEditorData } from "@/lib/programs/queries";
 import {
   dayNameSchema,
@@ -54,7 +55,9 @@ import { ProgramThumb } from "./program-thumb";
 import { NameDialog } from "./name-dialog";
 import { PendingButton } from "./pending-button";
 import { ProgramMenu } from "./program-menu";
+import { ProgramPhotoDialog } from "./program-photo-dialog";
 import { UnsavedGuard } from "./unsaved-guard";
+import { LevelBadge, useScheduleText } from "./template-info";
 
 let keySeq = 0;
 const newKey = (prefix: string) => `${prefix}-new-${Date.now().toString(36)}-${++keySeq}`;
@@ -69,15 +72,17 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
   const t = useTranslations("programs.editor");
   const tc = useTranslations("common");
   const errorText = useErrorText();
-  // Таймер з Settings — для нових вправ; наявні рядки не змінюються.
-  const defaultRest = useDefaultRest();
+  // Мінімальний відпочинок з Settings: лише при показі (чипи, ~хв) і для нових вправ.
+  const minRest = useMinRest();
   const readOnly = program.isTemplate;
+  const schedule = useScheduleText();
 
   const [draft, dispatch] = useReducer(draftReducer, data.draft);
   const [dayIndex, setDayIndex] = useState(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [renaming, setRenaming] = useState<null | "program" | "day">(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [saving, startSaving] = useTransition();
 
   // Після збереження сервер віддає нову версію (updated_at) — скидаємо чернетку
@@ -120,8 +125,10 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
       muscleGroup: ex.muscleGroup,
       equipment: ex.equipment,
       incrementKg: ex.incrementKg,
+      imagePath: ex.imagePath ?? null,
+      custom: ex.custom,
       ...NEW_EXERCISE_DEFAULTS,
-      restSeconds: defaultRest,
+      restSeconds: effectiveRest(NEW_EXERCISE_DEFAULTS.restSeconds, minRest),
     }));
     dispatch({ type: "addExercises", dayKey: day.key, exercises: rows });
     setExpandedKey(null);
@@ -160,12 +167,38 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
         >
           <ChevronLeft className="size-6" aria-hidden />
         </Link>
-        <ProgramThumb
-          program={{ id: program.id, name: draft.name, sourceTemplateId: program.sourceTemplateId }}
-          size="md"
-          active={program.isActive}
-          className="mr-1"
-        />
+        {readOnly ? (
+          <ProgramThumb
+            program={{ id: program.id, name: draft.name, sourceTemplateId: program.sourceTemplateId, isTemplate: true }}
+            size="md"
+            className="mr-1"
+          />
+        ) : (
+          // Власна програма: клік по мініатюрі — змінити фото.
+          <button
+            type="button"
+            onClick={() => setPhotoOpen(true)}
+            aria-label={t("changePhoto")}
+            title={t("changePhoto")}
+            className="group/photo relative mr-1 shrink-0 rounded-2xl focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+          >
+            <ProgramThumb
+              program={{
+                id: program.id,
+                name: draft.name,
+                sourceTemplateId: program.sourceTemplateId,
+                imagePath: program.imagePath,
+                isTemplate: false,
+              }}
+              size="md"
+              active={program.isActive}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-2xl bg-black/0 transition group-hover/photo:bg-black/25"
+            />
+          </button>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             {readOnly && <Lock className="size-5 shrink-0 text-muted-foreground" aria-label={t("readOnly")} />}
@@ -183,11 +216,14 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {t("meta", {
-              days: draft.days.length,
-              exercises: draft.days.reduce((s, d) => s + d.exercises.length, 0),
-            })}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            {readOnly
+              ? schedule(program.daysPerWeek, draft.days.length)
+              : t("meta", {
+                  days: draft.days.length,
+                  exercises: draft.days.reduce((s, d) => s + d.exercises.length, 0),
+                })}
+            {readOnly && program.level && <LevelBadge level={program.level} />}
           </p>
         </div>
         {!readOnly && (
@@ -208,6 +244,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
               isActive={program.isActive}
               dirty={dirty}
               onRename={() => setRenaming("program")}
+              onChangePhoto={() => setPhotoOpen(true)}
             />
           </div>
         )}
@@ -224,6 +261,8 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
           </p>
         </form>
       )}
+
+      {readOnly && <TemplateOverview description={program.description} days={draft.days} />}
 
       {/* Вкладки днів */}
       <div
@@ -275,7 +314,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
       {/* День */}
       <section id="day-panel" role="tabpanel" aria-label={day.name} className="mt-4">
         <div className="flex min-h-10 items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground/85">{t("daySummary", dayStats(day.exercises))}</p>
+          <p className="text-sm font-semibold text-foreground/85">{t("daySummary", dayStats(day.exercises, minRest))}</p>
           {!readOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -384,6 +423,13 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
             addedIds={addedIds}
             onAdd={addExercises}
           />
+          {!readOnly && (
+            <ProgramPhotoDialog
+              open={photoOpen}
+              onOpenChange={setPhotoOpen}
+              program={{ id: program.id, name: draft.name, sourceTemplateId: program.sourceTemplateId, imagePath: program.imagePath }}
+            />
+          )}
           <NameDialog
             open={renaming === "program"}
             onOpenChange={(open) => !open && setRenaming(null)}
@@ -455,5 +501,35 @@ function StartDay({
         {label}
       </PendingButton>
     </form>
+  );
+}
+
+/** Шаблон (лише перегляд): опис мовою інтерфейсу і зведення кожного дня. */
+function TemplateOverview({
+  description,
+  days,
+}: {
+  description: string | null;
+  days: ProgramEditorData["draft"]["days"];
+}) {
+  const t = useTranslations("programs.template");
+  const te = useTranslations("programs.editor");
+  const minRest = useMinRest();
+  return (
+    <section aria-labelledby="template-about" className="mt-5 rounded-2xl border border-foreground/10 bg-card p-4">
+      <h2 id="template-about" className="font-heading text-base font-bold">
+        {t("about")}
+      </h2>
+      {description && <p className="mt-1 text-sm text-foreground/85">{description}</p>}
+      <h3 className="mt-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t("overview")}</h3>
+      <ul className="mt-1.5 space-y-1">
+        {days.map((d) => (
+          <li key={d.key} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+            <span className="font-semibold">{d.name || te("untitled")}</span>
+            <span className="text-muted-foreground">{te("daySummary", dayStats(d.exercises, minRest))}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { setLocaleCookie } from "@/lib/auth/locale";
 import { createClient } from "@/lib/supabase/server";
-import { profilePatchSchema, restSecondsSchema, toProfileColumns, type ProfilePatch } from "./schema";
+import { profilePatchSchema, toProfileColumns, type ProfilePatch } from "./schema";
 
 /** error — код повідомлення (errors.*); текст підставляє клієнт. */
 export type SettingsActionResult = { ok: true } | { ok: false; error: string };
@@ -40,7 +40,7 @@ export async function updateProfile(patch: ProfilePatch): Promise<SettingsAction
     .eq("id", auth.userId);
   if (error) {
     console.error("updateProfile", error);
-    // Колонки default_rest_seconds ще немає.
+    // Колонки min_rest_seconds ще немає (міграцію min_rest не застосовано).
     if (error.code === "PGRST204" || error.code === "42703") return { ok: false, error: MIGRATION_HINT };
     return { ok: false, error: "settingsSaveFailed" };
   }
@@ -51,27 +51,6 @@ export async function updateProfile(patch: ProfilePatch): Promise<SettingsAction
 
   revalidateEverything();
   return { ok: true };
-}
-
-/** Таймер з налаштувань → rest_seconds усіх вправ у програмах користувача. */
-export async function applyDefaultRest(
-  seconds: number,
-): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
-  const parsed = restSecondsSchema.safeParse(seconds);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "restRange" };
-
-  const auth = await requireUser();
-  if (!auth) return { ok: false, error: SESSION_EXPIRED };
-
-  const { data, error } = await auth.supabase.rpc("apply_default_rest", { p_seconds: parsed.data });
-  if (error) {
-    console.error("applyDefaultRest", error);
-    if (error.code === "PGRST202") return { ok: false, error: MIGRATION_HINT };
-    return { ok: false, error: "applyRestFailed" };
-  }
-
-  revalidateEverything();
-  return { ok: true, updated: data ?? 0 };
 }
 
 /**

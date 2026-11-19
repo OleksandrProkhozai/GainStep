@@ -13,9 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useLocale, useTranslations } from "next-intl";
-import { useDefaultRest } from "@/components/preferences/preferences-provider";
+import { useMinRest } from "@/components/preferences/preferences-provider";
 import { exerciseName, matchesExerciseQuery } from "@/lib/i18n/names";
 import { formatRest } from "@/lib/programs/draft";
+import { effectiveRest } from "@/lib/workout/rest";
 import { createClient } from "@/lib/supabase/client";
 import { loadExerciseHistory, toWorkoutExercise } from "@/lib/workout/queries";
 import { ADDED_EXERCISE_DEFAULTS, type Equipment, type MuscleGroup } from "@/lib/workout/types";
@@ -115,6 +116,7 @@ type ExerciseOption = {
   equipment: Equipment;
   weight_increment: number;
   owner_id: string | null;
+  image_path: string | null;
 };
 
 /**
@@ -130,8 +132,8 @@ export function AddExerciseDialog({ open, onOpenChange }: { open: boolean; onOpe
   const locale = useLocale();
   const exercises = useWorkout((s) => s.exercises);
   const addExercise = useWorkout((s) => s.addExercise);
-  // Таймер з налаштувань — лише для нових вправ; наявні вправи не змінюються.
-  const defaultRest = useDefaultRest();
+  // Нова вправа: відпочинок 1:30, але не менший за мінімум з налаштувань.
+  const newRest = effectiveRest(ADDED_EXERCISE_DEFAULTS.restSeconds, useMinRest());
   const [options, setOptions] = useState<ExerciseOption[] | null>(null);
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
@@ -141,7 +143,7 @@ export function AddExerciseDialog({ open, onOpenChange }: { open: boolean; onOpe
     let cancelled = false;
     createClient()
       .from("exercises")
-      .select("id, name, name_uk, muscle_group, equipment, weight_increment, owner_id")
+      .select("id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path")
       .order("name")
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -180,7 +182,7 @@ export function AddExerciseDialog({ open, onOpenChange }: { open: boolean; onOpe
     setAdding(option.id);
     try {
       const history = await loadExerciseHistory(createClient(), [option.id]);
-      addExercise(toWorkoutExercise(option, { ...ADDED_EXERCISE_DEFAULTS, restSeconds: defaultRest }, history.get(option.id)));
+      addExercise(toWorkoutExercise(option, { ...ADDED_EXERCISE_DEFAULTS, restSeconds: newRest }, history.get(option.id)));
       setQuery("");
       onOpenChange(false);
     } catch (error) {
@@ -201,7 +203,7 @@ export function AddExerciseDialog({ open, onOpenChange }: { open: boolean; onOpe
               sets: ADDED_EXERCISE_DEFAULTS.targetSets,
               repMin: ADDED_EXERCISE_DEFAULTS.repMin,
               repMax: ADDED_EXERCISE_DEFAULTS.repMax,
-              rest: formatRest(defaultRest),
+              rest: formatRest(newRest),
             })}
           </DialogDescription>
         </DialogHeader>
@@ -234,7 +236,10 @@ export function AddExerciseDialog({ open, onOpenChange }: { open: boolean; onOpe
                     onClick={() => pick(o)}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none disabled:opacity-60"
                   >
-                    <ExerciseThumb exercise={{ muscleGroup: o.muscle_group }} size="sm" />
+                    <ExerciseThumb
+                      exercise={{ muscleGroup: o.muscle_group, imagePath: o.image_path, custom: o.owner_id !== null }}
+                      size="sm"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">
                         {exerciseName({ name: o.name, nameUk: o.name_uk }, locale)}

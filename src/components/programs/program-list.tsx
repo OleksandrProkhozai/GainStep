@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { NewProgramButton } from "./name-dialog";
 import { PendingButton } from "./pending-button";
 import { ProgramThumb } from "./program-thumb";
+import { LevelBadge, useScheduleText } from "./template-info";
 
 function ActiveBadge() {
   const t = useTranslations("programs.list");
@@ -26,6 +27,7 @@ function ActiveBadge() {
 export function ProgramList({ data, selectedId }: { data: ProgramsList; selectedId: string | null }) {
   const t = useTranslations("programs.list");
   const meta = (p: ProgramCard) => t("meta", { days: p.days.length, exercises: p.exerciseCount });
+  const schedule = useScheduleText();
   const active = data.mine.find((p) => p.isActive) ?? null;
   const others = data.mine.filter((p) => !p.isActive);
 
@@ -123,7 +125,10 @@ export function ProgramList({ data, selectedId }: { data: ProgramsList; selected
                 <ProgramThumb program={tpl} size="md" className="max-sm:size-12" />
                 <span className="min-w-0">
                   <span className="block truncate text-base leading-snug font-semibold">{tpl.name}</span>
-                  <span className="mt-0.5 block text-[13px] text-muted-foreground">{meta(tpl)}</span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                    {schedule(tpl.daysPerWeek, tpl.days.length)}
+                  </span>
+                  {tpl.level && <LevelBadge level={tpl.level} className="mt-1" />}
                 </span>
               </Link>
               <form action={cloneTemplate.bind(null, tpl.id)} className="shrink-0 self-center">

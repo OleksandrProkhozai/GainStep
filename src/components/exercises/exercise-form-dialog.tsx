@@ -17,6 +17,10 @@ import {
   type MuscleGroup,
 } from "@/lib/exercises/catalog";
 import { useUnit } from "@/components/preferences/preferences-provider";
+import { ImagePicker } from "@/components/images/image-picker";
+import { useImageDraft } from "@/components/images/use-image-draft";
+import { EXERCISE_IMAGES_BUCKET } from "@/lib/exercises/images";
+import { ExerciseThumb } from "./exercise-thumb";
 import { formatWeightValue, inputToKg, unitLabel, weightStep, type WeightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
@@ -97,12 +101,16 @@ function ExerciseForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Фото: null — картинка за замовчуванням; у базу шлях іде лише при збереженні.
+  const image = useImageDraft(EXERCISE_IMAGES_BUCKET, exercise?.imagePath ?? null);
+  const shownError = error ?? image.error;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     // Крок відправляємо в кг: незмінене поле лишає початкове значення
     // (2.5 kg показується як 5.5 lb — без цього збереження дало б 2.49 kg).
     const stepKg = inputToKg(Number(step.replace(",", ".")), unit, exercise?.incrementKg);
-    const input = { name, muscleGroup, equipment, weightStep: stepKg, unit: "kg" as const };
+    const input = { name, muscleGroup, equipment, weightStep: stepKg, unit: "kg" as const, imagePath: image.path };
     const parsed = exerciseFormSchema.safeParse(input);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "invalidForm");
@@ -115,6 +123,8 @@ function ExerciseForm({
         setError(result.error);
         return;
       }
+      // Збережене фото тепер належить вправі — при закритті форми не прибирати.
+      image.commit();
       toast.success(exercise ? t("updated") : t("created"));
       onDone(result.exercise);
     });
@@ -123,6 +133,16 @@ function ExerciseForm({
   return (
     <form onSubmit={submit} noValidate className="flex min-h-0 flex-col">
       <div className="space-y-4 overflow-y-auto px-4 pb-2 lg:px-5">
+        <ImagePicker
+          preview={<ExerciseThumb exercise={{ muscleGroup, imagePath: image.path, custom: true }} size="lg" />}
+          hasImage={image.path !== null}
+          uploading={image.uploading}
+          onPick={(file) => {
+            setError(null);
+            void image.pick(file);
+          }}
+          onReset={image.reset}
+        />
         <div>
           <label htmlFor={`${id}-name`} className="mb-1.5 block text-sm font-medium">
             {t("name")}
@@ -206,9 +226,9 @@ function ExerciseForm({
             {t("weightStepHint")}
           </p>
         </div>
-        {error && (
+        {shownError && (
           <p role="alert" className="text-sm font-medium text-destructive">
-            {errorText(error)}
+            {errorText(shownError)}
           </p>
         )}
       </div>
@@ -216,7 +236,7 @@ function ExerciseForm({
         <Button type="button" variant="outline-pill" onClick={onCancel} className="flex-1">
           {tc("cancel")}
         </Button>
-        <Button type="submit" disabled={pending} aria-busy={pending} className="flex-1">
+        <Button type="submit" disabled={pending || image.uploading} aria-busy={pending} className="flex-1">
           {pending && <Loader2 className="animate-spin" aria-hidden />}
           {exercise ? tc("save") : t("create")}
         </Button>

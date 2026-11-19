@@ -43,6 +43,7 @@ export type Database = {
           description: string | null
           equipment: Database["public"]["Enums"]["equipment_type"]
           id: string
+          image_path: string | null
           is_compound: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
@@ -55,6 +56,7 @@ export type Database = {
           description?: string | null
           equipment: Database["public"]["Enums"]["equipment_type"]
           id?: string
+          image_path?: string | null
           is_compound?: boolean
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
@@ -67,6 +69,7 @@ export type Database = {
           description?: string | null
           equipment?: Database["public"]["Enums"]["equipment_type"]
           id?: string
+          image_path?: string | null
           is_compound?: boolean
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
@@ -80,12 +83,12 @@ export type Database = {
         Row: {
           active_program_id: string | null
           created_at: string
-          default_rest_seconds: number
           display_name: string | null
           experience: Database["public"]["Enums"]["experience_level"] | null
           goal: Database["public"]["Enums"]["training_goal"] | null
           id: string
           locale: string
+          min_rest_seconds: number
           onboarded_at: string | null
           unit: Database["public"]["Enums"]["weight_unit"]
           updated_at: string
@@ -93,12 +96,12 @@ export type Database = {
         Insert: {
           active_program_id?: string | null
           created_at?: string
-          default_rest_seconds?: number
           display_name?: string | null
           experience?: Database["public"]["Enums"]["experience_level"] | null
           goal?: Database["public"]["Enums"]["training_goal"] | null
           id: string
           locale?: string
+          min_rest_seconds?: number
           onboarded_at?: string | null
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
@@ -106,12 +109,12 @@ export type Database = {
         Update: {
           active_program_id?: string | null
           created_at?: string
-          default_rest_seconds?: number
           display_name?: string | null
           experience?: Database["public"]["Enums"]["experience_level"] | null
           goal?: Database["public"]["Enums"]["training_goal"] | null
           id?: string
           locale?: string
+          min_rest_seconds?: number
           onboarded_at?: string | null
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
@@ -211,7 +214,10 @@ export type Database = {
           created_at: string
           days_per_week: number
           description: string | null
+          description_uk: string | null
           id: string
+          image_path: string | null
+          level: Database["public"]["Enums"]["experience_level"] | null
           name: string
           name_uk: string | null
           owner_id: string | null
@@ -222,7 +228,10 @@ export type Database = {
           created_at?: string
           days_per_week: number
           description?: string | null
+          description_uk?: string | null
           id?: string
+          image_path?: string | null
+          level?: Database["public"]["Enums"]["experience_level"] | null
           name: string
           name_uk?: string | null
           owner_id?: string | null
@@ -233,7 +242,10 @@ export type Database = {
           created_at?: string
           days_per_week?: number
           description?: string | null
+          description_uk?: string | null
           id?: string
+          image_path?: string | null
+          level?: Database["public"]["Enums"]["experience_level"] | null
           name?: string
           name_uk?: string | null
           owner_id?: string | null
@@ -350,10 +362,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_default_rest: {
-        Args: { p_seconds: number }
-        Returns: number
-      }
       clone_program: {
         Args: { p_locale?: string; template_id: string }
         Returns: string
@@ -364,6 +372,15 @@ export type Database = {
       }
       save_program: {
         Args: { p_program_id: string; p_payload: Json }
+        Returns: undefined
+      }
+      save_workout_sets: {
+        Args: {
+          p_notes: string
+          p_sets: Json
+          p_started_at: string
+          p_workout_id: string
+        }
         Returns: undefined
       }
     }

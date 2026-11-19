@@ -62,6 +62,19 @@
         "kg": "kg",
         "lb": "lb"
       }
+    },
+    "notFound": {
+      "title": "Page not found",
+      "text": "It may have been deleted, or the link is wrong. Let's get you back to training.",
+      "home": "Go to dashboard",
+      "programs": "My programs"
+    },
+    "photo": {
+      "label": "Photo",
+      "upload": "Upload photo",
+      "change": "Change photo",
+      "reset": "Use default",
+      "hint": "JPG, PNG or WebP up to 10 MB. Cropped to a square."
     }
   },
   "nav": {
@@ -156,8 +169,23 @@
     "nothingToUpdate": "Nothing to update",
     "settingsNotSetUp": "Settings aren’t set up yet — run the settings migration in Supabase.",
     "settingsSaveFailed": "Couldn’t save your settings. Please try again.",
-    "applyRestFailed": "Couldn’t update your programs. Please try again.",
-    "accountDeleteFailed": "Couldn’t delete your account. Please try again."
+    "accountDeleteFailed": "Couldn’t delete your account. Please try again.",
+    "minRestRange": "Minimum rest must be between 0:00 and 5:00",
+    "imageTypeUnsupported": "This file type isn’t supported — use JPG, PNG or WebP.",
+    "imageTooLarge": "The photo is too large — up to 10 MB.",
+    "imageUploadFailed": "Couldn’t upload the photo. Please try again.",
+    "exerciseImageInvalid": "This photo can’t be used. Upload it again.",
+    "programImageInvalid": "This photo can’t be used. Upload it again.",
+    "programImageFailed": "Couldn’t save the photo. Please try again.",
+    "editWeightRange": "Enter a weight from 0 to 500 kg (1102 lb)",
+    "editRepsRange": "Reps must be a whole number from 0 to 100",
+    "exerciseNeedsSet": "Each exercise needs at least one set",
+    "workoutNeedsExercise": "A workout needs at least one exercise",
+    "workoutStartFuture": "The start time can’t be in the future",
+    "workoutEditNotSetUp": "Editing isn’t set up yet — run the save_workout_sets migration.",
+    "workoutSaveFailed": "Couldn’t save the workout. Please try again.",
+    "workoutDeleteFailed": "Couldn’t delete the workout. Please try again.",
+    "exportFailed": "Couldn’t prepare the file. Please try again."
   },
   "auth": {
     "meta": {
@@ -259,7 +287,8 @@
         "level": "Level",
         "program": "Program"
       }
-    }
+    },
+    "recommended": "Recommended"
   },
   "dashboard": {
     "metaTitle": "Dashboard",
@@ -612,7 +641,8 @@
         "title": "Rename day",
         "description": "For example Push, Upper or Day A.",
         "label": "Day name"
-      }
+      },
+      "changePhoto": "Change photo"
     },
     "next": {
       "label": "Next {weight} {arrow}",
@@ -635,7 +665,8 @@
       "weightStep": "Weight step",
       "remove": "Remove",
       "decrease": "Decrease {label}",
-      "increase": "Increase {label}"
+      "increase": "Increase {label}",
+      "minRestTooltip": "Minimum rest from settings"
     },
     "list": {
       "active": "Active",
@@ -661,7 +692,8 @@
       "deleteConfirm": "Delete program",
       "deleteTitle": "Delete “{name}”?",
       "deleteText": "The program and its days will be deleted. Your workout history stays.",
-      "deleteActiveWarning": "This is your active program — you won’t have one until you pick a new program, and the dashboard will ask you to choose."
+      "deleteActiveWarning": "This is your active program — you won’t have one until you pick a new program, and the dashboard will ask you to choose.",
+      "changePhoto": "Change photo"
     },
     "newProgram": {
       "new": "New program",
@@ -679,6 +711,16 @@
       "label": "Programs section",
       "programs": "Programs",
       "exercises": "Exercises"
+    },
+    "template": {
+      "schedule": "{perWeek}× a week · {alternating, select, true {{days, plural, one {# day} other {# days}} alternating} other {{days, plural, one {# day} other {# days}}}}",
+      "about": "About this program",
+      "overview": "Days at a glance"
+    },
+    "photo": {
+      "dialogTitle": "Program photo",
+      "dialogDescription": "Shown in the program list and editor. Without a photo — the default image.",
+      "saved": "Photo saved"
     }
   },
   "exercises": {
@@ -757,14 +799,10 @@
       "title": "Preferences",
       "language": "Language",
       "units": "Units",
-      "rest": "Default rest timer",
-      "restHint": "Used for new exercises",
+      "rest": "Minimum rest",
+      "restHint": "No exercise will rest less than this. 0:00 turns it off.",
       "restDecrease": "Decrease rest by 15 seconds",
-      "restIncrease": "Increase rest by 15 seconds",
-      "restSet": "Default rest set to {time}",
-      "restSetText": "New exercises will use it. Existing programs keep their rest.",
-      "applyAll": "Apply to all my programs",
-      "applied": "{count, plural, one {Updated # exercise} other {Updated # exercises}}"
+      "restIncrease": "Increase rest by 15 seconds"
     },
     "account": {
       "title": "Account",
@@ -777,6 +815,170 @@
       "confirmLabel": "Type <b>{word}</b> to confirm",
       "confirm": "Delete account",
       "deleted": "Account deleted"
+    }
+  },
+  "history": {
+    "metaTitle": "Workout history",
+    "switch": {
+      "label": "Workouts section",
+      "today": "Today",
+      "history": "History"
+    },
+    "showPrevious": "Show previous month",
+    "moreActions": "More actions",
+    "calendar": {
+      "prev": "Previous month",
+      "next": "Next month",
+      "expand": "Expand month",
+      "collapse": "Collapse month",
+      "hasWorkout": "has a workout",
+      "filtered": "Showing: {date}",
+      "clearDay": "Show the whole month"
+    },
+    "summary": {
+      "title": "Month summary",
+      "workouts": "{count, plural, one {workout} other {workouts}}",
+      "volume": "{unit} volume",
+      "records": "{count, plural, one {record} other {records}}",
+      "workoutsChip": "{count, plural, one {# workout} other {# workouts}}",
+      "volumeChip": "{value} {unit}",
+      "recordsChip": "{count, plural, one {# record} other {# records}}"
+    },
+    "records": {
+      "title": "Recent records",
+      "empty": "No records yet — they show up when you beat your best."
+    },
+    "filters": {
+      "label": "Filters",
+      "program": "Program",
+      "exercise": "Exercise",
+      "allPrograms": "All programs",
+      "allExercises": "All exercises",
+      "search": "Search",
+      "searchLabel": "Search day names, exercises and notes",
+      "searchExercises": "Search exercises",
+      "noExercises": "Nothing found",
+      "clearSearch": "Clear search"
+    },
+    "weeks": {
+      "this": "This week",
+      "last": "Last week",
+      "count": "{count, plural, one {# workout} other {# workouts}}"
+    },
+    "card": {
+      "prs": "{count, plural, one {# record} other {# records}}",
+      "deload": "Deload",
+      "sets": "{count, plural, one {# set} other {# sets}}",
+      "more": "+{count}",
+      "expand": "Expand “{name}”",
+      "open": "Open",
+      "share": "Share",
+      "moreExercises": "{count, plural, one {+# more exercise} other {+# more exercises}}"
+    },
+    "table": {
+      "set": "Set",
+      "weight": "Weight",
+      "reps": "Reps",
+      "e1rm": "1RM",
+      "record": "Record",
+      "newRecord": "New record",
+      "notDone": "not done"
+    },
+    "empty": {
+      "title": "No workouts yet",
+      "text": "Finished workouts will show up here — with records and volume.",
+      "cta": "Start a workout",
+      "month": "No workouts this month.",
+      "noResults": "Nothing found",
+      "noResultsText": "Try different filters or another search.",
+      "reset": "Reset filters"
+    },
+    "export": {
+      "button": "Export to Excel",
+      "title": "Export to Excel",
+      "description": "An .xlsx file with three sheets: workouts, sets and records.",
+      "month": "Current month",
+      "all": "All workouts",
+      "download": "Download",
+      "started": "Preparing the file…",
+      "sheets": {
+        "workouts": "Workouts",
+        "sets": "Sets",
+        "records": "Records"
+      },
+      "columns": {
+        "date": "Date",
+        "day": "Program day",
+        "duration": "Duration, min",
+        "sets": "Sets",
+        "volume": "Volume",
+        "records": "Records",
+        "notes": "Notes",
+        "exercise": "Exercise",
+        "muscle": "Muscle group",
+        "set": "Set",
+        "weight": "Weight",
+        "reps": "Reps",
+        "e1rm": "1RM (Epley)",
+        "completed": "Completed",
+        "result": "Weight × reps"
+      },
+      "yes": "yes",
+      "no": "no"
+    },
+    "detail": {
+      "metaTitle": "Workout",
+      "back": "Back to history",
+      "menu": "Workout actions",
+      "edit": "Edit",
+      "share": "Share",
+      "delete": "Delete workout",
+      "duration": "duration",
+      "volume": "volume",
+      "sets": "{count, plural, one {set} other {sets}}",
+      "records": "{count, plural, one {record} other {records}}",
+      "notes": "Note",
+      "setsSummary": "{count, plural, one {# set} other {# sets}}",
+      "deleteDialog": {
+        "title": "Delete this workout?",
+        "text": "“{name}” and all its sets will be deleted. Records and suggestions will be recalculated. This can’t be undone.",
+        "confirm": "Delete"
+      },
+      "deleted": "Workout deleted"
+    },
+    "edit": {
+      "metaTitle": "Edit workout",
+      "title": "Edit",
+      "back": "Back to workout",
+      "date": "Date",
+      "time": "Start time",
+      "durationNote": "Duration {duration} stays the same — the end time moves with the start.",
+      "notes": "Note",
+      "notesPlaceholder": "How did it go?",
+      "weight": "Weight, {unit}",
+      "reps": "Reps",
+      "done": "Done",
+      "setLabel": "Set {n}",
+      "addSet": "Add set",
+      "removeSet": "Remove set {n}",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Changes saved",
+      "invalid": "Check the highlighted fields"
+    },
+    "share": {
+      "text": "My workout in GainStep",
+      "preparing": "Preparing the image…",
+      "downloaded": "Image downloaded, summary copied",
+      "downloadedNoCopy": "Image downloaded",
+      "failed": "Couldn’t share. Please try again.",
+      "image": {
+        "duration": "duration",
+        "volume": "volume",
+        "sets": "sets",
+        "best": "Best sets",
+        "records": "{count, plural, one {# new record} other {# new records}}"
+      }
     }
   }
 }

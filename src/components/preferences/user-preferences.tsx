@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { REST_LIMITS } from "@/lib/profile/schema";
 import { PreferencesProvider, type ClientPreferences } from "./preferences-provider";
 
-const FALLBACK: ClientPreferences = { unit: "kg", defaultRestSeconds: REST_LIMITS.fallback };
+const FALLBACK: ClientPreferences = { unit: "kg", minRestSeconds: REST_LIMITS.fallback };
 
 /**
  * Серверна обгортка для layout: створює promise налаштувань (без await,
@@ -13,7 +13,7 @@ const FALLBACK: ClientPreferences = { unit: "kg", defaultRestSeconds: REST_LIMIT
  */
 export function UserPreferences({ children }: { children: ReactNode }) {
   const preferences = getCurrentUser().then(
-    (user): ClientPreferences => ({ unit: user.unit, defaultRestSeconds: user.defaultRestSeconds }),
+    (user): ClientPreferences => ({ unit: user.unit, minRestSeconds: user.minRestSeconds }),
     () => FALLBACK,
   );
   return <PreferencesProvider preferences={preferences}>{children}</PreferencesProvider>;

@@ -25,7 +25,7 @@ function formatDuration(startedAt: string, finishedAt: string | null, locale: st
   return minutes === null ? "—" : formatMinutes(minutes, locale);
 }
 
-/** Останні завершені тренування (повна історія — Етап 8). */
+/** Останні завершені тренування (повна історія — /workouts/history). */
 export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit: WeightUnit }) {
   const t = useTranslations("workouts.recentList");
   const locale = useLocale();
@@ -61,7 +61,7 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
           return (
             <li key={w.id}>
               <Link
-                href={`/workout/${w.id}/summary`}
+                href={`/workouts/${w.id}`}
                 className="block transition-colors hover:bg-foreground/3 focus-visible:bg-foreground/4 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none focus-visible:ring-inset active:bg-foreground/5"
               >
                 {/* Телефон: два рядки */}

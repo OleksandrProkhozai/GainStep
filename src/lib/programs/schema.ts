@@ -40,8 +40,8 @@ const int = (min: number, max: number, code: string) => z.number().int(code).min
 
 export const programExerciseSchema = z
   .object({
-    id: z.uuid().nullable(),
-    exercise_id: z.uuid(),
+    id: z.guid().nullable(),
+    exercise_id: z.guid(),
     target_sets: int(L.setsMin, L.setsMax, "setsRange"),
     rep_min: int(L.repsMin, L.repsMax, "repsRange"),
     rep_max: int(L.repsMin, L.repsMax, "repsRange"),
@@ -54,7 +54,7 @@ export const programExerciseSchema = z
 
 export const programDaySchema = z
   .object({
-    id: z.uuid().nullable(),
+    id: z.guid().nullable(),
     name: dayNameSchema,
     exercises: z.array(programExerciseSchema),
   })

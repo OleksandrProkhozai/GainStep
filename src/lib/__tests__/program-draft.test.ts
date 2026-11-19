@@ -60,6 +60,22 @@ describe("estimateDayMinutes", () => {
     expect(estimateDayMinutes([{ targetSets: 3, restSeconds: 110 }])).toBe(10);
   });
 
+  it("з мінімальним відпочинком: короткий відпочинок піднімається до мінімуму", () => {
+    const day = [
+      { targetSets: 4, restSeconds: 180 }, // 180 > 120 — без змін
+      { targetSets: 3, restSeconds: 60 }, // 60 → 120
+      { targetSets: 3, restSeconds: 60 }, // 60 → 120
+    ];
+    // без мінімуму: 4 × 220 + 2 × 3 × 100 = 880 + 600 = 1480 с ≈ 24.7 хв → 25
+    expect(estimateDayMinutes(day)).toBe(25);
+    expect(estimateDayMinutes(day, 0)).toBe(25);
+    // мінімум 2:00: 4 × 220 + 2 × 3 × 160 = 880 + 960 = 1840 с ≈ 30.7 хв → 30
+    expect(estimateDayMinutes(day, 120)).toBe(30);
+    // мінімум нижчий за всі відпочинки — нічого не змінює
+    expect(estimateDayMinutes(day, 45)).toBe(25);
+    expect(dayStats(day, 120)).toEqual({ exercises: 3, sets: 10, minutes: 30 });
+  });
+
   it("порожній день і відпочинок 0", () => {
     expect(estimateDayMinutes([])).toBe(0);
     expect(estimateDayMinutes([{ targetSets: 10, restSeconds: 0 }])).toBe(5); // 400 с ≈ 6.7 хв

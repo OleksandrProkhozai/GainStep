@@ -36,7 +36,7 @@ async function Onboarding() {
   const [supabase, locale] = await Promise.all([createClient(), getLocale()]);
   const { data: templates, error } = await supabase
     .from("programs")
-    .select("id, name, name_uk, days_per_week")
+    .select("id, name, name_uk, days_per_week, program_days ( count )")
     .is("owner_id", null)
     .order("days_per_week", { ascending: true })
     .order("name", { ascending: true });
@@ -47,6 +47,7 @@ async function Onboarding() {
     id: t.id,
     name: localizedName(t, locale),
     days_per_week: t.days_per_week,
+    dayCount: t.program_days[0]?.count ?? 0,
   }));
   return <OnboardingWizard templates={list} />;
 }

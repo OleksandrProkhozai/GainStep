@@ -12,6 +12,6 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Редактор програми (шаблон — лише перегляд). Чужа або неіснуюча → 404. */
 export default async function ProgramPage({ params }: PageProps<"/programs/[id]">) {
   const { id } = await params;
-  if (!z.uuid().safeParse(id).success) notFound();
+  if (!z.guid().safeParse(id).success) notFound();
   return <ProgramsWorkspace selectedId={id} />;
 }

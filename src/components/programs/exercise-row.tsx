@@ -2,16 +2,18 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Minus, Plus, Trash2 } from "lucide-react";
+import { GripVertical, Lock, Minus, Plus, Trash2 } from "lucide-react";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 import { useLocale, useTranslations } from "next-intl";
 import { useWeightFormat } from "@/components/i18n/use-format";
+import { useMinRest } from "@/components/preferences/preferences-provider";
 import { Button } from "@/components/ui/button";
 import { exerciseName } from "@/lib/i18n/names";
 import { formatRest, formatScheme, type DraftExercise } from "@/lib/programs/draft";
 import type { NextChip as NextChipData } from "@/lib/programs/next";
 import { PROGRAM_LIMITS as L } from "@/lib/programs/schema";
 import { cn } from "@/lib/utils";
+import { effectiveRest, isRaisedByMin } from "@/lib/workout/rest";
 
 // ───────────── Чип Next ─────────────
 
@@ -163,6 +165,12 @@ export function ExerciseRow({
   const panelId = `row-${exercise.key}-panel`;
   const e = exercise;
   const showWeightStep = chip.action !== "bodyweight";
+  // Відпочинок з урахуванням мінімуму з Settings; rest_seconds у чернетці не змінюється,
+  // доки користувач сам не натисне степер.
+  const minRest = useMinRest();
+  const rest = effectiveRest(e.restSeconds, minRest);
+  const raised = isRaisedByMin(e.restSeconds, minRest);
+  const restFloor = Math.max(L.restMin, minRest);
 
   // Плитка + текст + Next: на sm+ — один рядок, на телефоні Next під метриками.
   const body = (
@@ -175,7 +183,15 @@ export function ExerciseRow({
         </span>
         <span className="mt-2 flex min-w-0 flex-wrap gap-1.5">
           <MetricChip>{formatScheme(e)}</MetricChip>
-          <MetricChip>{t("rest", { time: formatRest(e.restSeconds) })}</MetricChip>
+          <MetricChip>
+            {t("rest", { time: formatRest(rest) })}
+            {raised && (
+              <span title={t("minRestTooltip")} className="ml-1 inline-flex text-muted-foreground">
+                <Lock className="size-3" aria-hidden />
+                <span className="sr-only">{t("minRestTooltip")}</span>
+              </span>
+            )}
+          </MetricChip>
         </span>
       </span>
       <NextChip chip={chip} className="self-center justify-self-end [grid-area:next]" />
@@ -241,12 +257,12 @@ export function ExerciseRow({
             />
             <Stepper
               label={t("restLabel")}
-              value={e.restSeconds}
-              display={formatRest(e.restSeconds)}
-              canDecrement={e.restSeconds > L.restMin}
-              canIncrement={e.restSeconds < L.restMax}
-              onDecrement={() => onChange({ restSeconds: e.restSeconds - L.restStep })}
-              onIncrement={() => onChange({ restSeconds: e.restSeconds + L.restStep })}
+              value={rest}
+              display={formatRest(rest)}
+              canDecrement={rest > restFloor}
+              canIncrement={rest < L.restMax}
+              onDecrement={() => onChange({ restSeconds: Math.max(restFloor, rest - L.restStep) })}
+              onIncrement={() => onChange({ restSeconds: rest + L.restStep })}
             />
             <Stepper
               label={t("minReps")}

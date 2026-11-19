@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CircleCheck, Copy, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Camera, CircleCheck, Copy, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
@@ -25,13 +25,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { deleteProgram, duplicateProgram, setActiveProgram } from "@/lib/programs/actions";
 
-/** Меню «…» редактора: Set as active, Rename, Duplicate, Delete. */
+/** Меню «…» редактора: Set as active, Rename, Change photo, Duplicate, Delete. */
 export function ProgramMenu({
   programId,
   name,
   isActive,
   dirty,
   onRename,
+  onChangePhoto,
 }: {
   programId: string;
   name: string;
@@ -39,6 +40,7 @@ export function ProgramMenu({
   /** Є незбережені зміни — Duplicate копіює збережену версію, попереджаємо. */
   dirty: boolean;
   onRename: () => void;
+  onChangePhoto: () => void;
 }) {
   const t = useTranslations("programs.menu");
   const tc = useTranslations("common");
@@ -73,6 +75,10 @@ export function ProgramMenu({
           <DropdownMenuItem onSelect={onRename}>
             <Pencil aria-hidden />
             {t("rename")}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onChangePhoto}>
+            <Camera aria-hidden />
+            {t("changePhoto")}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {

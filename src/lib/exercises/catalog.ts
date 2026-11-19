@@ -1,4 +1,5 @@
 import { matchesExerciseQuery } from "@/lib/i18n/names";
+import { IMAGE_PATH_RE } from "./images";
 import { z } from "@/lib/validations/zod-codes";
 import type { Enums } from "@/types/database.types";
 
@@ -48,6 +49,8 @@ export interface LibraryExercise {
   incrementKg: number;
   /** Власна вправа користувача (owner_id = user). */
   custom: boolean;
+  /** Фото вправи: шлях у bucket exercise-images; null — картинка за замовчуванням. */
+  imagePath?: string | null;
 }
 
 export interface ExerciseFilter {
@@ -98,6 +101,9 @@ export const exerciseFormSchema = z.object({
   equipment: z.enum(EQUIPMENT),
   weightStep: z.number({ error: "weightStepRequired" }).positive("weightStepPositive"),
   unit: z.enum(["kg", "lb"]),
+  /** Шлях фото в bucket ("<user id>/<uuid>.webp"); null — картинка за замовчуванням. */
+  imagePath: z.string().regex(IMAGE_PATH_RE, "exerciseImageInvalid").nullable().default(null),
 });
 
-export type ExerciseFormInput = z.infer<typeof exerciseFormSchema>;
+export type ExerciseFormInput = z.input<typeof exerciseFormSchema>;
+export type ExerciseFormData = z.output<typeof exerciseFormSchema>;

@@ -19,6 +19,15 @@ type Named = { name: string; name_uk: string | null };
 /** Збережена назва (en або uk) → рядок шаблону з обома мовами. */
 export type TemplateNames = ReadonlyMap<string, Named>;
 
+/**
+ * Колишні назви днів шаблонів (до 20261119000002_better_templates.sql).
+ * Копії, склоновані раніше, зберігають їх — і далі показуємо мовою інтерфейсу.
+ */
+export const LEGACY_TEMPLATE_NAMES: readonly Named[] = [
+  { name: "Upper", name_uk: "Верх" },
+  { name: "Lower", name_uk: "Низ" },
+];
+
 /** Словник з рядків шаблонів: програми й дні, ключі — обидві назви. */
 export function buildTemplateNames(
   templates: readonly (Named & { program_days?: readonly Named[] | null })[],
@@ -52,5 +61,5 @@ export const getTemplateNames = cache(async (supabase: SupabaseClient<Database>)
     console.error("template names", error);
     return new Map();
   }
-  return buildTemplateNames(data);
+  return buildTemplateNames([...data, ...LEGACY_TEMPLATE_NAMES]);
 });

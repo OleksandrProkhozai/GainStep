@@ -5,6 +5,7 @@ import { Info, LayoutGrid } from "lucide-react";
 import { ActiveWorkoutBanner } from "@/components/workouts/active-workout-banner";
 import { DayCard } from "@/components/workouts/day-card";
 import { RecentWorkouts } from "@/components/workouts/recent-workouts";
+import { WorkoutsSwitch } from "@/components/history/workouts-switch";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Хаб тренувань: незавершене тренування, старт будь-якого дня активної
- * програми та останні завершені тренування. Повна історія — Етап 8.
+ * програми та останні завершені тренування. Повна історія — /workouts/history.
  */
 export default async function WorkoutsPage() {
   const user = await getCurrentUser();
@@ -28,13 +29,16 @@ export default async function WorkoutsPage() {
 
   return (
     <div className="space-y-7 md:space-y-9">
-      <header>
-        <h1 className="font-heading text-[26px] leading-tight font-extrabold tracking-tight md:text-[32px]">
-          {t("title")}
-        </h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {t("subtitle")}
-        </p>
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+        <div>
+          <h1 className="font-heading text-[26px] leading-tight font-extrabold tracking-tight md:text-[32px]">
+            {t("title")}
+          </h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {t("subtitle")}
+          </p>
+        </div>
+        <WorkoutsSwitch active="today" className="md:ml-auto" />
       </header>
 
       {data.active && <ActiveWorkoutBanner workout={data.active} />}

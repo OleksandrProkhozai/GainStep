@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { programInitials } from "@/lib/programs/initials";
-import { programImage } from "@/lib/programs/template-images";
+import { programThumbSrc } from "@/lib/programs/images";
 import { cn } from "@/lib/utils";
 
 export type ProgramThumbSize = "sm" | "md" | "lg";
@@ -9,8 +9,9 @@ const PX: Record<ProgramThumbSize, number> = { sm: 44, md: 56, lg: 72 };
 const SIZE_CLASS: Record<ProgramThumbSize, string> = { sm: "size-11", md: "size-14", lg: "size-[72px]" };
 
 /**
- * Мініатюра програми: картинка шаблону (для шаблону — за id, для копії —
- * за source_template_id), інакше плитка з ініціалами (FB / UL / PPL).
+ * Мініатюра програми: власне фото (bucket program-images) → картинка шаблону
+ * (для шаблону — за id, для копії — за source_template_id) → для власної
+ * програми картинка за замовчуванням → плитка з ініціалами (FB / UL / PPL).
  * Розміри: sm 44, md 56, lg 72; className може перевизначити розмір
  * (напр. max-sm:size-12). Фігури на картинках на весь зріст, тому
  * object-position — center 30% (у квадраті видно торс).
@@ -21,13 +22,21 @@ export function ProgramThumb({
   active = false,
   className,
 }: {
-  program: { id: string; name: string; sourceTemplateId?: string | null };
+  program: {
+    id: string;
+    name: string;
+    sourceTemplateId?: string | null;
+    /** Шлях фото в bucket program-images. */
+    imagePath?: string | null;
+    /** false — власна програма (без фото — картинка за замовчуванням). */
+    isTemplate?: boolean;
+  };
   size?: ProgramThumbSize;
   /** Ініціали активної програми — лаймовим. */
   active?: boolean;
   className?: string;
 }) {
-  const src = programImage(program);
+  const src = programThumbSrc({ ...program, custom: program.isTemplate === false });
   const box = cn("shrink-0 rounded-2xl", SIZE_CLASS[size], className);
 
   if (!src) {
@@ -53,6 +62,8 @@ export function ProgramThumb({
       alt=""
       width={px}
       height={px}
+      // Фото зі Storage вже стиснуте (512×512) — без оптимізації Next.
+      unoptimized={src.startsWith("http")}
       className={cn("border border-[#24262B] bg-[#0E0F11] object-cover object-[center_30%]", box)}
     />
   );

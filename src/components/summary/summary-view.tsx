@@ -88,7 +88,7 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
             <Link href="/" className={cn(pill, "h-12 w-full bg-primary text-base text-primary-foreground hover:bg-primary/90")}>
               {t("done")}
             </Link>
-            <Link href="/workouts" className={cn(pill, "h-12 w-full border border-foreground/40 text-base hover:bg-foreground/5")}>
+            <Link href="/workouts/history" className={cn(pill, "h-12 w-full border border-foreground/40 text-base hover:bg-foreground/5")}>
               {t("viewHistory")}
             </Link>
           </div>
@@ -102,7 +102,7 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
             {t("done")}
           </Link>
           <Link
-            href="/workouts"
+            href="/workouts/history"
             className="mt-1 inline-flex h-11 items-center px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             {t("viewHistory")}

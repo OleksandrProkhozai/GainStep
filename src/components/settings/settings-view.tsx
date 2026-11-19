@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
-import { applyDefaultRest, deleteAccount, updateProfile } from "@/lib/profile/actions";
+import { deleteAccount, updateProfile } from "@/lib/profile/actions";
 import { LOCALE_LABELS, LOCALES, type Locale } from "@/i18n/config";
 import { getInitials } from "@/lib/profile/initials";
 import {
@@ -44,7 +44,8 @@ export interface SettingsInitial {
   experience: Experience | null;
   goal: Goal | null;
   unit: WeightUnit;
-  defaultRestSeconds: number;
+  /** Мінімальний відпочинок, с (0 — вимкнено). */
+  minRestSeconds: number;
   /** Поточна мова інтерфейсу (профіль / cookie / Accept-Language). */
   locale: Locale;
 }
@@ -351,7 +352,6 @@ function ProfileCard({ initial }: { initial: SettingsInitial }) {
 
 function PreferencesCard({ initial }: { initial: SettingsInitial }) {
   const t = useTranslations("settings.preferences");
-  const errorText = useErrorText();
   const { status, save } = useProfileSaver();
   const ids = { unit: useId(), rest: useId(), language: useId() };
   const [locale, setLocale] = useState<Locale>(initial.locale);
@@ -359,8 +359,8 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
   const [unit, setUnit] = useState<WeightUnit>(initial.unit);
 
 
-  const [rest, setRest] = useState(initial.defaultRestSeconds);
-  const savedRest = useRef(initial.defaultRestSeconds);
+  const [rest, setRest] = useState(initial.minRestSeconds);
+  const savedRest = useRef(initial.minRestSeconds);
   const restTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(restTimer.current), []);
 
@@ -381,21 +381,6 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
     void save({ locale: next }, () => setLocale(prev));
   };
 
-  const offerApply = (seconds: number) => {
-    toast.success(t("restSet", { time: formatRest(seconds) }), {
-      description: t("restSetText"),
-      duration: 8000,
-      action: {
-        label: t("applyAll"),
-        onClick: async () => {
-          const result = await applyDefaultRest(seconds);
-          if (!result.ok) toast.error(errorText(result.error));
-          else toast.success(t("applied", { count: result.updated }));
-        },
-      },
-    });
-  };
-
   const changeRest = (direction: 1 | -1) => {
     const next = stepRest(rest, direction);
     if (next === rest) return;
@@ -405,11 +390,10 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
       if (next === savedRest.current) return;
       const previous = savedRest.current;
       savedRest.current = next;
-      const ok = await save({ defaultRestSeconds: next }, () => {
+      await save({ minRestSeconds: next }, () => {
         savedRest.current = previous;
         setRest(previous);
       });
-      if (ok) offerApply(next);
     }, REST_DEBOUNCE);
   };
 

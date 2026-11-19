@@ -31,7 +31,8 @@ export const getSession = cache(async function getSession() {
     unit: profile?.unit ?? "kg",
     experience: profile?.experience ?? null,
     goal: profile?.goal ?? null,
-    defaultRestSeconds: profile?.default_rest_seconds ?? REST_LIMITS.fallback,
+    /** Мінімальний відпочинок, с (0 — вимкнено). */
+    minRestSeconds: profile?.min_rest_seconds ?? REST_LIMITS.fallback,
     /** null — колонки ще немає (міграцію i18n не застосовано). */
     locale: (isLocale(profile?.locale) ? profile.locale : null) as Locale | null,
   };
@@ -41,7 +42,7 @@ export const getSession = cache(async function getSession() {
  * Поточний користувач для Server Components (Data Access Layer); без сесії —
  * редирект на /login. Єдине серверне джерело налаштувань профілю (unit,
  * таймер, рівень, ціль, мова). На клієнті unit і таймер віддає
- * PreferencesProvider з layout (useUnit / useDefaultRest), мову — next-intl.
+ * PreferencesProvider з layout (useUnit / useMinRest), мову — next-intl.
  */
 export const getCurrentUser = cache(async function getCurrentUser() {
   const session = await getSession();
@@ -57,32 +58,34 @@ type ProfileRow = {
   unit: "kg" | "lb";
   experience: "beginner" | "intermediate" | null;
   goal: "strength" | "hypertrophy" | null;
-  default_rest_seconds: number;
+  min_rest_seconds: number;
   locale: string | null;
 };
 
 async function loadProfile(supabase: Supabase, userId: string): Promise<ProfileRow | null> {
   const res = await supabase
     .from("profiles")
-    .select("display_name, onboarded_at, unit, experience, goal, default_rest_seconds, locale")
+    .select("display_name, onboarded_at, unit, experience, goal, min_rest_seconds, locale")
     .eq("id", userId)
     .maybeSingle();
-  // 42703 — нових колонок ще немає (міграції settings / i18n не застосовано).
+  // 42703 — нових колонок ще немає (міграції i18n / min_rest не застосовано).
   // Без цього профіль був би null і користувача кидало б в онбординг.
   if (res.error?.code === "42703") {
-    // Спершу без locale (i18n), потім і без default_rest_seconds (settings).
-    const noLocale = await supabase
+    // Спершу без min_rest_seconds (міграція min_rest), потім і без locale (i18n).
+    const noMinRest = await supabase
       .from("profiles")
-      .select("display_name, onboarded_at, unit, experience, goal, default_rest_seconds")
+      .select("display_name, onboarded_at, unit, experience, goal, locale")
       .eq("id", userId)
       .maybeSingle();
-    if (!noLocale.error) return noLocale.data ? { ...noLocale.data, locale: null } : null;
+    if (!noMinRest.error) {
+      return noMinRest.data ? { ...noMinRest.data, min_rest_seconds: REST_LIMITS.fallback } : null;
+    }
     const legacy = await supabase
       .from("profiles")
       .select("display_name, onboarded_at, unit, experience, goal")
       .eq("id", userId)
       .maybeSingle();
-    return legacy.data ? { ...legacy.data, default_rest_seconds: REST_LIMITS.fallback, locale: null } : null;
+    return legacy.data ? { ...legacy.data, min_rest_seconds: REST_LIMITS.fallback, locale: null } : null;
   }
   return res.data;
 }

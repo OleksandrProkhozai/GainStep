@@ -21,10 +21,10 @@ export default async function WorkoutPage({ params }: PageProps<"/workout/[id]">
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user.onboarded) redirect("/onboarding");
-  if (!z.uuid().safeParse(id).success) notFound();
+  if (!z.guid().safeParse(id).success) notFound();
 
   const [supabase, locale] = await Promise.all([createClient(), getLocale()]);
-  const result = await loadWorkout(supabase, id, user.id, user.defaultRestSeconds, locale);
+  const result = await loadWorkout(supabase, id, user.id, locale);
   if (result.kind === "not-found") notFound();
   if (result.kind === "completed") redirect(`/workout/${id}/summary`);
 

@@ -35,12 +35,16 @@ import {
   rovingTabIndex,
 } from "./onboarding-ui";
 import { ProgramThumb } from "@/components/programs/program-thumb";
+import { useScheduleText } from "@/components/programs/template-info";
+import { recommendTemplateId } from "@/lib/programs/templates";
 
 export type ProgramTemplate = {
   id: string;
   /** Уже мовою інтерфейсу (name_uk для uk). */
   name: string;
   days_per_week: number;
+  /** Кількість днів програми (для підпису розкладу). */
+  dayCount: number;
 };
 
 type Unit = Enums<"weight_unit">;
@@ -110,11 +114,15 @@ export function OnboardingWizard({
         ? experience !== null
         : program !== null;
 
+  // Рекомендований шаблон за досвідом; вибрати можна будь-який.
+  const schedule = useScheduleText();
+  const recommendedId = recommendTemplateId(experience);
   const programOptions = [
     ...templates.map((tpl) => ({
       id: tpl.id,
       title: tpl.name,
-      description: t("daysPerWeek", { count: tpl.days_per_week }),
+      description: schedule(tpl.days_per_week, tpl.dayCount),
+      badge: tpl.id === recommendedId ? t("recommended") : undefined,
       icon: Dumbbell,
       program: { id: tpl.id, name: tpl.name },
     })),
@@ -124,6 +132,7 @@ export function OnboardingWizard({
       description: t("custom.description"),
       icon: Settings,
       program: null,
+      badge: undefined,
     },
   ];
 
@@ -283,6 +292,7 @@ export function OnboardingWizard({
                       media={item.program && <ProgramThumb program={item.program} size="md" />}
                       title={item.title}
                       description={item.description}
+                      badge={item.badge}
                       selected={program === item.id}
                       tabIndex={rovingTabIndex(
                         program === item.id,
@@ -405,6 +415,7 @@ export function OnboardingWizard({
                 media={item.program && <ProgramThumb program={item.program} size="sm" />}
                 title={item.title}
                 description={item.description}
+                badge={item.badge}
                 selected={program === item.id}
                 tabIndex={rovingTabIndex(
                   program === item.id,

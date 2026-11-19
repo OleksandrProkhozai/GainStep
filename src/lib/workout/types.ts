@@ -18,6 +18,10 @@ export interface WorkoutExercise {
   equipment: Equipment;
   /** Крок ваги вправи, кг (exercises.weight_increment). */
   increment: number;
+  /** Фото вправи (шлях у bucket); старі збережені стани — без поля. */
+  imagePath?: string | null;
+  /** Власна вправа — мініатюра за замовчуванням не група м'язів, а фото. */
+  custom?: boolean;
   targetSets: number;
   repMin: number;
   repMax: number;

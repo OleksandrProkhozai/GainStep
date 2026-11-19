@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 /** error — код повідомлення (errors.*); текст підставляє клієнт. */
 export type WorkoutActionResult = { error: string };
 
-const idSchema = z.uuid();
+const idSchema = z.guid();
 const notesSchema = z.string().max(2000);
 
 async function requireUser() {

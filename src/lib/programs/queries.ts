@@ -3,7 +3,7 @@ import type { LibraryExercise } from "@/lib/exercises/catalog";
 import { loadExerciseSessions } from "@/lib/workout/queries";
 import { localizedName } from "@/lib/i18n/names";
 import { getTemplateNames, templateName } from "./template-names";
-import type { Database } from "@/types/database.types";
+import type { Database, Enums } from "@/types/database.types";
 import type { ProgramDraft } from "./draft";
 import { toRecentHistory, type RecentHistory } from "./next";
 
@@ -16,9 +16,15 @@ export type ProgramCard = {
   isActive: boolean;
   /** Шаблон, з якого склоновано програму (для картинки ProgramThumb). */
   sourceTemplateId: string | null;
+  /** Власне фото програми (шлях у bucket program-images). */
+  imagePath: string | null;
   /** Назви днів за position. */
   days: { id: string; name: string }[];
   exerciseCount: number;
+  /** programs.days_per_week (для підпису розкладу шаблону). */
+  daysPerWeek: number;
+  /** Рівень шаблону; у програм користувачів — null. */
+  level: Enums<"experience_level"> | null;
 };
 
 export type ProgramsList = {
@@ -37,7 +43,7 @@ export async function getProgramsList(supabase: Client, userId: string, locale: 
     supabase.from("profiles").select("active_program_id").eq("id", userId).maybeSingle(),
     supabase
       .from("programs")
-      .select("id, name, name_uk, owner_id, source_template_id, created_at, program_days ( id, name, name_uk, position, program_exercises ( count ) )")
+      .select("id, name, name_uk, owner_id, source_template_id, image_path, days_per_week, level, created_at, program_days ( id, name, name_uk, position, program_exercises ( count ) )")
       .order("created_at", { ascending: true }),
     getTemplateNames(supabase),
   ]);
@@ -54,8 +60,11 @@ export async function getProgramsList(supabase: Client, userId: string, locale: 
       isTemplate: p.owner_id === null,
       isActive: p.id === activeProgramId,
       sourceTemplateId: p.source_template_id,
+      imagePath: p.image_path,
       days: days.map((d) => ({ id: d.id, name: templateName(localizedName(d, locale), templateNames, locale) })),
       exerciseCount: days.reduce((sum, d) => sum + (d.program_exercises[0]?.count ?? 0), 0),
+      daysPerWeek: p.days_per_week,
+      level: p.level,
     };
   });
 
@@ -68,7 +77,7 @@ export async function getProgramsList(supabase: Client, userId: string, locale: 
   };
 }
 
-const LIBRARY_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id";
+const LIBRARY_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path";
 
 type LibraryRow = {
   id: string;
@@ -78,6 +87,7 @@ type LibraryRow = {
   equipment: LibraryExercise["equipment"];
   weight_increment: number;
   owner_id: string | null;
+  image_path: string | null;
 };
 
 export function toLibraryExercise(row: LibraryRow): LibraryExercise {
@@ -89,6 +99,7 @@ export function toLibraryExercise(row: LibraryRow): LibraryExercise {
     equipment: row.equipment,
     incrementKg: Number(row.weight_increment),
     custom: row.owner_id !== null,
+    imagePath: row.image_path,
   };
 }
 
@@ -107,8 +118,15 @@ export type ProgramEditorData = {
     isActive: boolean;
     /** Шаблон, з якого склоновано програму (для картинки ProgramThumb). */
     sourceTemplateId: string | null;
+    /** Власне фото програми (шлях у bucket program-images). */
+    imagePath: string | null;
     /** updated_at — змінюється після кожного збереження (скидання чернетки). */
     version: string;
+    /** Опис мовою інтерфейсу (description_uk для uk). */
+    description: string | null;
+    daysPerWeek: number;
+    /** Рівень шаблону; у програм користувачів — null. */
+    level: Enums<"experience_level"> | null;
   };
   draft: ProgramDraft;
   library: LibraryExercise[];
@@ -133,7 +151,7 @@ export async function getProgramEditor(
     supabase
       .from("programs")
       .select(
-        `id, name, name_uk, owner_id, source_template_id, updated_at,
+        `id, name, name_uk, description, description_uk, days_per_week, level, owner_id, source_template_id, image_path, updated_at,
          program_days ( id, name, name_uk, position,
            program_exercises ( id, position, exercise_id, target_sets, rep_min, rep_max, rest_seconds,
              exercise:exercises ( ${LIBRARY_COLUMNS} ) ) )`,
@@ -160,7 +178,11 @@ export async function getProgramEditor(
       isTemplate: program.owner_id === null,
       isActive: program.id === activeProgramId,
       sourceTemplateId: program.source_template_id,
+      imagePath: program.image_path,
       version: program.updated_at,
+      description: (locale === "uk" && program.description_uk) || program.description,
+      daysPerWeek: program.days_per_week,
+      level: program.level,
     },
     draft: {
       // Шаблон (лише перегляд) — мовою інтерфейсу; у власних name_uk порожнє.
@@ -181,6 +203,8 @@ export async function getProgramEditor(
             muscleGroup: pe.exercise!.muscle_group,
             equipment: pe.exercise!.equipment,
             incrementKg: Number(pe.exercise!.weight_increment),
+            imagePath: pe.exercise!.image_path,
+            custom: pe.exercise!.owner_id !== null,
             targetSets: pe.target_sets,
             repMin: pe.rep_min,
             repMax: pe.rep_max,

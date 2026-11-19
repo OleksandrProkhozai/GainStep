@@ -5,6 +5,7 @@
  */
 
 import type { Equipment, MuscleGroup } from "@/lib/exercises/catalog";
+import { effectiveRest } from "@/lib/workout/rest";
 import { PROGRAM_LIMITS as L, type SaveProgramPayload } from "./schema";
 
 export interface DraftExercise {
@@ -20,6 +21,10 @@ export interface DraftExercise {
   equipment: Equipment;
   /** Крок ваги вправи, кг. */
   incrementKg: number;
+  /** Фото вправи (лише для показу мініатюри). */
+  imagePath?: string | null;
+  /** Власна вправа (мініатюра за замовчуванням — фото, а не група м'язів). */
+  custom?: boolean;
   targetSets: number;
   repMin: number;
   repMax: number;
@@ -220,20 +225,30 @@ export const SET_WORK_SECONDS = 40;
 
 /**
  * Орієнтовна тривалість дня, хв: сума по вправах
- * sets × (rest_seconds + 40 с), округлена до 5 хв.
+ * sets × (ефективний відпочинок + 40 с), округлена до 5 хв.
+ * Ефективний відпочинок — effectiveRest(rest_seconds, мінімум з налаштувань).
  */
-export function estimateDayMinutes(exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[]) {
-  const seconds = exercises.reduce((sum, e) => sum + e.targetSets * (e.restSeconds + SET_WORK_SECONDS), 0);
+export function estimateDayMinutes(
+  exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[],
+  minRestSeconds = 0,
+) {
+  const seconds = exercises.reduce(
+    (sum, e) => sum + e.targetSets * (effectiveRest(e.restSeconds, minRestSeconds) + SET_WORK_SECONDS),
+    0,
+  );
   return Math.round(seconds / 60 / 5) * 5;
 }
 
 /** "6 exercises · 20 sets · ~65 min". */
 /** Зведення дня для рядка "5 exercises · 15 sets · ~40 min" (текст — у компоненті). */
-export function dayStats(exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[]) {
+export function dayStats(
+  exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[],
+  minRestSeconds = 0,
+) {
   return {
     exercises: exercises.length,
     sets: exercises.reduce((s, e) => s + e.targetSets, 0),
-    minutes: estimateDayMinutes(exercises),
+    minutes: estimateDayMinutes(exercises, minRestSeconds),
   };
 }
 
