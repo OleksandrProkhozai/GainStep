@@ -6,6 +6,8 @@ import { ChevronRight, Dumbbell } from "lucide-react";
 import { formatMinutes, toDayKey } from "@/lib/dates";
 import { createWeightFormat, type WeightUnit } from "@/lib/units";
 import type { HubRecent } from "@/lib/workout/hub-queries";
+import { WorkoutMenu } from "@/components/history/workout-actions";
+import type { ShareableWorkout } from "@/components/history/share-button";
 import { workoutDurationMinutes } from "@/lib/workout/summary";
 
 /**
@@ -25,7 +27,26 @@ function formatDuration(startedAt: string, finishedAt: string | null, locale: st
   return minutes === null ? "—" : formatMinutes(minutes, locale);
 }
 
-/** Останні завершені тренування (повна історія — /workouts/history). */
+/** Дані для меню "…" (поділитися / видалити). Рекорди на хабі не рахуються — лише текст підпису без 🏆. */
+function shareable(w: HubRecent): ShareableWorkout {
+  return {
+    id: w.id,
+    name: w.name,
+    dayKey: toDayKey(w.startedAt),
+    stats: {
+      durationMinutes: workoutDurationMinutes(w.startedAt, w.finishedAt),
+      volumeKg: w.volumeKg,
+      setsDone: w.setsDone,
+    },
+    prCount: 0,
+  };
+}
+
+/**
+ * Останні завершені тренування (повна історія — /workouts/history).
+ * Рядок веде на /workouts/[id]; праворуч — меню "…" (Відкрити,
+ * Редагувати, Поділитися, Видалити).
+ */
 export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit: WeightUnit }) {
   const t = useTranslations("workouts.recentList");
   const locale = useLocale();
@@ -43,15 +64,16 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
 
   return (
     <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-card">
-      <div
-        aria-hidden
-        className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] gap-4 border-b border-foreground/5 px-5 py-3 text-xs font-medium tracking-wide text-muted-foreground uppercase md:grid"
-      >
-        <span>{t("workout")}</span>
-        <span>{t("date")}</span>
-        <span>{t("duration")}</span>
-        <span className="text-right">{t("volume")}</span>
-        <span className="text-right">{t("sets")}</span>
+      <div aria-hidden className="hidden items-center gap-1 border-b border-foreground/5 pr-3 md:flex">
+        <div className="grid flex-1 grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] gap-4 py-3 pl-5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <span>{t("workout")}</span>
+          <span>{t("date")}</span>
+          <span>{t("duration")}</span>
+          <span className="text-right">{t("volume")}</span>
+          <span className="text-right">{t("sets")}</span>
+        </div>
+        {/* Місце під кнопку меню в рядках. */}
+        <span className="size-10 shrink-0" />
       </div>
       <ul className="divide-y divide-foreground/5">
         {workouts.map((w) => {
@@ -59,13 +81,13 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
           const date = formatDay(w.startedAt, locale);
           const duration = formatDuration(w.startedAt, w.finishedAt, locale);
           return (
-            <li key={w.id}>
+            <li key={w.id} className="flex items-center gap-1 pr-2 md:pr-3">
               <Link
                 href={`/workouts/${w.id}`}
-                className="block transition-colors hover:bg-foreground/3 focus-visible:bg-foreground/4 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none focus-visible:ring-inset active:bg-foreground/5"
+                className="block min-w-0 flex-1 transition-colors hover:bg-foreground/3 focus-visible:bg-foreground/4 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none focus-visible:ring-inset active:bg-foreground/5"
               >
                 {/* Телефон: два рядки */}
-                <div className="flex items-center gap-3 py-3.5 pr-2.5 pl-4 md:hidden">
+                <div className="flex items-center gap-3 py-3.5 pr-1 pl-4 md:hidden">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold">{w.name}</p>
                     <p className="text-sm text-muted-foreground">
@@ -84,7 +106,7 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 </div>
                 {/* md+: таблиця */}
-                <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] items-center gap-4 px-5 py-3.5 text-sm md:grid">
+                <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,0.6fr)] items-center gap-4 py-3.5 pl-5 text-sm md:grid">
                   <span className="truncate text-[15px] font-semibold">{w.name}</span>
                   <span className="text-muted-foreground">{date}</span>
                   <span className="text-muted-foreground tabular-nums">{duration}</span>
@@ -95,6 +117,7 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
                   <span className="text-right tabular-nums">{w.setsDone}</span>
                 </div>
               </Link>
+              <WorkoutMenu workout={shareable(w)} variant="card" />
             </li>
           );
         })}

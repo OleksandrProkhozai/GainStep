@@ -50,6 +50,8 @@ export interface HistoryExerciseMeta {
   name: string;
   nameUk: string | null;
   muscleGroup: string;
+  /** Обладнання (barbell, machine, …) — для експорту. */
+  equipment?: string;
   imagePath: string | null;
   custom: boolean;
 }

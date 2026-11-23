@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { ArrowUpRight, Loader2, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
@@ -29,15 +29,21 @@ import { HISTORY_PATH } from "@/lib/history/url";
 import { cn } from "@/lib/utils";
 import { ShareButton, useShareWorkout, type ShareableWorkout } from "./share-button";
 
-/** Підтвердження видалення → server action → історія + toast. */
+/**
+ * Підтвердження видалення → server action → toast. Зі сторінки тренування
+ * (redirectTo) — перехід в історію; зі списку (redirectTo = null) —
+ * лишаємось на місці й оновлюємо дані сторінки.
+ */
 function DeleteDialog({
   workout,
   open,
   onOpenChange,
+  redirectTo = HISTORY_PATH,
 }: {
   workout: ShareableWorkout;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  redirectTo?: string | null;
 }) {
   const t = useTranslations("history.detail");
   const tc = useTranslations("common");
@@ -54,7 +60,8 @@ function DeleteDialog({
       }
       onOpenChange(false);
       toast.success(t("deleted"));
-      router.replace(HISTORY_PATH);
+      if (redirectTo) router.replace(redirectTo);
+      else router.refresh();
     });
 
   return (
@@ -85,25 +92,54 @@ function DeleteDialog({
   );
 }
 
-/** Меню "…" у шапці: Редагувати, Поділитися, Видалити. */
-export function WorkoutMenu({ workout, className }: { workout: ShareableWorkout; className?: string }) {
+const triggerStyles = {
+  /** Шапка сторінки тренування — кругла кнопка з рамкою. */
+  header: "size-11 border border-foreground/12 bg-card hover:bg-foreground/5",
+  /** Картка в списку — без рамки, щоб не сперечатися з карткою. */
+  card: "size-10 text-muted-foreground hover:bg-foreground/6 hover:text-foreground data-[state=open]:bg-foreground/6 data-[state=open]:text-foreground",
+} as const;
+
+/**
+ * Меню "…": (Відкрити), Редагувати, Поділитися, Видалити.
+ * - variant "header" — шапка сторінки тренування; після видалення — в історію;
+ * - variant "card" — картки списків (історія, "Останні тренування"):
+ *   є пункт "Відкрити", після видалення список просто оновлюється.
+ */
+export function WorkoutMenu({
+  workout,
+  variant = "header",
+  className,
+}: {
+  workout: ShareableWorkout;
+  variant?: keyof typeof triggerStyles;
+  className?: string;
+}) {
   const t = useTranslations("history.detail");
+  const tc = useTranslations("history.card");
   const router = useRouter();
   const { share, prefetch } = useShareWorkout(workout);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const inList = variant === "card";
   return (
     <>
       <DropdownMenu onOpenChange={(o) => o && prefetch()}>
         <DropdownMenuTrigger
-          aria-label={t("menu")}
+          aria-label={inList ? `${t("menu")}: ${workout.name}` : t("menu")}
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-full border border-foreground/12 bg-card transition hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
+            "flex shrink-0 items-center justify-center rounded-full transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
+            triggerStyles[variant],
             className,
           )}
         >
           <MoreHorizontal className="size-5" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-52">
+          {inList && (
+            <DropdownMenuItem onSelect={() => router.push(`/workouts/${workout.id}`)}>
+              <ArrowUpRight aria-hidden />
+              {tc("open")}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onSelect={() => router.push(`/workouts/${workout.id}/edit`)}>
             <Pencil aria-hidden />
             {t("edit")}
@@ -119,7 +155,12 @@ export function WorkoutMenu({ workout, className }: { workout: ShareableWorkout;
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DeleteDialog workout={workout} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      <DeleteDialog
+        workout={workout}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        redirectTo={inList ? null : HISTORY_PATH}
+      />
     </>
   );
 }

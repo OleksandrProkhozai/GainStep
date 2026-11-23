@@ -27,9 +27,10 @@ export async function GET(request: Request) {
   }
 
   const [supabase, locale] = await Promise.all([createClient(), getRequestLocale()]);
-  const [t, tm] = await Promise.all([
+  const [t, tm, te] = await Promise.all([
     getTranslations({ locale, namespace: "history.export" }),
     getTranslations({ locale, namespace: "common.enums.muscle" }),
+    getTranslations({ locale, namespace: "common.enums.equipment" }),
   ]);
 
   const today = toDayKey(new Date());
@@ -41,24 +42,31 @@ export async function GET(request: Request) {
       unit: session.unit,
       locale,
       labels: {
+        journal: {
+          date: t("columns.date"),
+          day: t("columns.day"),
+          exercise: t("columns.exercise"),
+          muscle: t("columns.muscle"),
+          equipment: t("columns.equipment"),
+          set: t("columns.set"),
+          weight: t("columns.weight"),
+          reps: t("columns.reps"),
+          setVolume: t("columns.setVolume"),
+          e1rm: t("columns.e1rm"),
+          record: t("columns.record"),
+          completed: t("columns.completed"),
+          notes: t("columns.workoutNotes"),
+        },
         workouts: {
           date: t("columns.date"),
           day: t("columns.day"),
           duration: t("columns.duration"),
+          exercises: t("columns.exercises"),
           sets: t("columns.sets"),
           volume: t("columns.volume"),
+          heaviest: t("columns.heaviest"),
           records: t("columns.records"),
           notes: t("columns.notes"),
-        },
-        sets: {
-          date: t("columns.date"),
-          exercise: t("columns.exercise"),
-          muscle: t("columns.muscle"),
-          set: t("columns.set"),
-          weight: t("columns.weight"),
-          reps: t("columns.reps"),
-          e1rm: t("columns.e1rm"),
-          completed: t("columns.completed"),
         },
         records: {
           exercise: t("columns.exercise"),
@@ -66,16 +74,36 @@ export async function GET(request: Request) {
           e1rm: t("columns.e1rm"),
           date: t("columns.date"),
         },
+        exercises: {
+          exercise: t("columns.exercise"),
+          first: t("columns.firstWorkout"),
+          last: t("columns.lastDate"),
+          workouts: t("columns.workoutsCount"),
+          best: t("columns.bestSet"),
+          bestE1rm: t("columns.bestE1rm"),
+          startWeight: t("columns.startWeight"),
+          currentWeight: t("columns.currentWeight"),
+          gain: t("columns.gain"),
+          gainPct: t("columns.gainPct"),
+        },
         yes: t("yes"),
         no: t("no"),
+        recordMark: t("recordMark"),
         muscle: (group) => (tm.has(group as never) ? tm(group as never) : group),
+        equipment: (eq) => (te.has(eq as never) ? te(eq as never) : eq),
       },
     });
 
     const buffer = await buildWorkbook(
       sheets,
-      { workouts: t("sheets.workouts"), sets: t("sheets.sets"), records: t("sheets.records") },
+      {
+        journal: t("sheets.journal"),
+        workouts: t("sheets.workouts"),
+        records: t("sheets.records"),
+        exercises: t("sheets.exercises"),
+      },
       locale,
+      { total: t("total") },
     );
     // Один календарний місяць → gainstep-workouts-2026-11.xlsx, інакше — all.
     const singleMonth = from && to && monthOf(from) === monthOf(to) && monthBounds(monthOf(from)).first === from ? monthOf(from) : null;

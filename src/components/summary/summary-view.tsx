@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { enGB, uk } from "date-fns/locale";
-import { Dumbbell, Layers, ListChecks, Sparkles, Target, Timer, Trophy, X } from "lucide-react";
+import { Dumbbell, Layers, ListChecks, Pencil, Sparkles, Target, Timer, Trophy, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Logo } from "@/components/app-shell/logo";
 import { PrBadge } from "@/components/workout/parts";
@@ -95,6 +95,7 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
             <Link href="/workouts/history" className={cn(pill, "h-12 w-full border border-foreground/40 text-base hover:bg-foreground/5")}>
               {t("viewHistory")}
             </Link>
+            <FixSetsLink workoutId={data.workoutId} className="self-center" />
           </div>
         </div>
       </main>
@@ -105,15 +106,36 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
           <Link href="/" className={cn(pill, "h-14 w-full bg-primary text-base text-primary-foreground")}>
             {t("done")}
           </Link>
-          <Link
-            href="/workouts/history"
-            className="mt-1 inline-flex h-11 items-center px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
-          >
-            {t("viewHistory")}
-          </Link>
+          <div className="mt-1 flex flex-wrap items-center justify-center">
+            <Link
+              href="/workouts/history"
+              className="inline-flex h-11 items-center px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+            >
+              {t("viewHistory")}
+            </Link>
+            <span aria-hidden className="size-[3px] rounded-full bg-muted-foreground/60" />
+            <FixSetsLink workoutId={data.workoutId} />
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** "Виправити підходи" → редагування (помилка з вагою одразу після тренування). */
+function FixSetsLink({ workoutId, className }: { workoutId: string; className?: string }) {
+  const t = useTranslations("summary");
+  return (
+    <Link
+      href={`/workouts/${workoutId}/edit`}
+      className={cn(
+        "inline-flex h-11 items-center gap-1.5 px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
+        className,
+      )}
+    >
+      <Pencil className="size-3.5" aria-hidden />
+      {t("fixSets")}
+    </Link>
   );
 }
 

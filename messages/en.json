@@ -516,7 +516,8 @@
       "updated": "“{day}” updated",
       "addedSr": "Added:",
       "removedSr": "Removed:"
-    }
+    },
+    "fixSets": "Fix sets"
   },
   "workouts": {
     "title": "Workouts",
@@ -937,20 +938,21 @@
     "export": {
       "button": "Export to Excel",
       "title": "Export to Excel",
-      "description": "An .xlsx file with three sheets: workouts, sets and records.",
+      "description": "An .xlsx file: set log, workouts, records and progress by exercise.",
       "month": "Current month",
       "all": "All workouts",
       "download": "Download",
       "started": "Preparing the file…",
       "sheets": {
+        "journal": "Log",
         "workouts": "Workouts",
-        "sets": "Sets",
-        "records": "Records"
+        "records": "Records",
+        "exercises": "Exercises"
       },
       "columns": {
         "date": "Date",
         "day": "Program day",
-        "duration": "Duration, min",
+        "duration": "Duration, h:mm",
         "sets": "Sets",
         "volume": "Volume",
         "records": "Records",
@@ -962,10 +964,27 @@
         "reps": "Reps",
         "e1rm": "1RM (Epley)",
         "completed": "Completed",
-        "result": "Weight × reps"
+        "result": "Weight × reps",
+        "equipment": "Equipment",
+        "setVolume": "Set volume",
+        "record": "Record",
+        "workoutNotes": "Workout notes",
+        "exercises": "Exercises",
+        "heaviest": "Heaviest weight",
+        "firstWorkout": "First workout",
+        "lastDate": "Last date",
+        "workoutsCount": "Workouts",
+        "bestSet": "Best weight × reps",
+        "bestE1rm": "Best 1RM",
+        "startWeight": "Starting working weight",
+        "currentWeight": "Current working weight",
+        "gain": "Gain",
+        "gainPct": "Gain, %"
       },
       "yes": "yes",
-      "no": "no"
+      "no": "no",
+      "recordMark": "🏆 Record",
+      "total": "Total"
     },
     "detail": {
       "metaTitle": "Workout",

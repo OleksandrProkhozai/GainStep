@@ -92,6 +92,7 @@ function toRaw(row: WorkoutRow, names: TemplateNames, locale: string) {
           name: s.exercise.name,
           nameUk: s.exercise.name_uk,
           muscleGroup: s.exercise.muscle_group,
+          equipment: s.exercise.equipment,
           imagePath: s.exercise.image_path,
           custom: s.exercise.owner_id !== null,
         },

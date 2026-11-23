@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { toTimeKey, wallClockDate, zonedTimeToISO } from "../dates";
 import {
@@ -14,7 +14,10 @@ import {
   type RawHistoryWorkout,
 } from "../history/derive";
 import { editWorkoutSchema, parseEditDraft, type EditDraft } from "../history/edit-schema";
-import { buildExportRows, columnWidths, exportFileName, type ExportLabels } from "../history/export";
+import ExcelJS from "exceljs";
+import JSZip from "jszip";
+import { buildExportRows, columnWidths, exportFileName, SHEET_ORDER, type ExportLabels } from "../history/export";
+import { buildWorkbook, tint } from "../history/xlsx";
 import { historyRange, monthBounds, parseMonthParam, queryBounds, shiftMonth } from "../history/month";
 import { historyHref, parseHistoryQuery } from "../history/url";
 import type { SetResult } from "../progression";
@@ -438,16 +441,91 @@ describe("parseEditDraft", () => {
 
 describe("buildExportRows", () => {
   const labels: ExportLabels = {
-    workouts: { date: "Дата", day: "День", duration: "Тривалість, хв", sets: "Підходи", volume: "Тоннаж", records: "Рекорди", notes: "Нотатка" },
-    sets: { date: "Дата", exercise: "Вправа", muscle: "Група", set: "Підхід", weight: "Вага", reps: "Повт", e1rm: "1ПМ", completed: "Виконано" },
+    journal: {
+      date: "Дата",
+      day: "День",
+      exercise: "Вправа",
+      muscle: "Група",
+      equipment: "Обладнання",
+      set: "Підхід",
+      weight: "Вага",
+      reps: "Повт",
+      setVolume: "Тоннаж підходу",
+      e1rm: "1ПМ",
+      record: "Рекорд",
+      completed: "Виконано",
+      notes: "Нотатка",
+    },
+    workouts: {
+      date: "Дата",
+      day: "День",
+      duration: "Тривалість",
+      exercises: "Вправ",
+      sets: "Підходи",
+      volume: "Тоннаж",
+      heaviest: "Найважча",
+      records: "Рекорди",
+      notes: "Нотатка",
+    },
     records: { exercise: "Вправа", result: "Вага × повт.", e1rm: "1ПМ", date: "Дата" },
+    exercises: {
+      exercise: "Вправа",
+      first: "Перше",
+      last: "Остання",
+      workouts: "Тренувань",
+      best: "Найкраще",
+      bestE1rm: "Найкращий 1ПМ",
+      startWeight: "Початок",
+      currentWeight: "Зараз",
+      gain: "Приріст",
+      gainPct: "Приріст, %",
+    },
     yes: "так",
     no: "ні",
-    muscle: (g) => (g === "chest" ? "Груди" : g),
+    recordMark: "🏆 Рекорд",
+    muscle: (g) => (g === "chest" ? "Груди" : g === "shoulders" ? "Плечі" : g),
+    equipment: (e) => (e === "barbell" ? "Штанга" : e === "machine" ? "Тренажер" : e),
   };
 
-  const w = workout({
+  const bench = { ...meta("bench", "Bench Press", "Жим штанги лежачи"), equipment: "barbell" };
+  const raise = {
+    ...meta("raise", "Machine Lateral Raise", "Махи в тренажері"),
+    muscleGroup: "shoulders",
+    equipment: "machine",
+  };
+
+  /** Старіше тренування: перше з цими вправами — рекордів немає. */
+  const w1 = workout({
     id: "w1",
+    dayKey: "2026-11-12",
+    name: "Push",
+    startedAt: "2026-11-12T16:00:00Z",
+    notes: "легко",
+    stats: { durationMinutes: 50, volumeKg: 1825, setsDone: 3 },
+    prCount: 0,
+    exercises: [
+      {
+        ...bench,
+        hasPR: false,
+        deload: false,
+        sets: [
+          { setNumber: 1, ...done(75, 10), isPR: false, e1rm: 100 },
+          { setNumber: 2, ...done(75, 9), isPR: false, e1rm: 97.5 },
+        ],
+      },
+      {
+        ...raise,
+        hasPR: false,
+        // Алгоритм позначив розвантаження — робочий підхід підсвічується.
+        deload: true,
+        sets: [{ setNumber: 1, ...done(40, 10), isPR: false, e1rm: 53.33 }],
+      },
+    ],
+  });
+
+  /** Новіше тренування: рекорд у жимі, один підхід не виконано. */
+  const w2 = workout({
+    id: "w2",
     dayKey: "2026-11-19",
     name: "Жим — Push",
     startedAt: "2026-11-19T16:10:00Z",
@@ -456,7 +534,7 @@ describe("buildExportRows", () => {
     prCount: 1,
     exercises: [
       {
-        ...meta("bench", "Bench Press", "Жим штанги лежачи"),
+        ...bench,
         hasPR: true,
         deload: false,
         sets: [
@@ -468,40 +546,231 @@ describe("buildExportRows", () => {
     ],
   });
 
-  it("три аркуші з заголовками, вагою в одиницях користувача і датами в київському часі", () => {
-    const sheets = buildExportRows([w], { unit: "kg", locale: "uk", labels });
-    const date = new Date("2026-11-19T18:10:00.000Z");
+  // Київський час (листопад — UTC+2), як його записує exceljs.
+  const d1 = new Date("2026-11-12T18:00:00.000Z");
+  const d2 = new Date("2026-11-19T18:10:00.000Z");
 
+  // На вході — від найновішого, як приходить з бази.
+  const sheets = buildExportRows([w2, w1], { unit: "kg", locale: "uk", labels });
+
+  it("порядок аркушів: журнал підходів першим", () => {
+    expect(SHEET_ORDER).toEqual(["journal", "workouts", "records", "exercises"]);
+    for (const key of SHEET_ORDER) expect(sheets[key].length).toBeGreaterThan(1);
+  });
+
+  it("журнал: рядок = підхід, від старих до нових; рекорд позначено, нотатка лише в першому рядку тренування", () => {
+    expect(sheets.journal[0]).toEqual([
+      "Дата",
+      "День",
+      "Вправа",
+      "Група",
+      "Обладнання",
+      "Підхід",
+      "Вага, кг",
+      "Повт",
+      "Тоннаж підходу, кг",
+      "1ПМ, кг",
+      "Рекорд",
+      "Виконано",
+      "Нотатка",
+    ]);
+    expect(sheets.journal.slice(1)).toEqual([
+      [d1, "Push", "Жим штанги лежачи", "Груди", "Штанга", 1, 75, 10, 750, 100, null, "так", "легко"],
+      [d1, "Push", "Жим штанги лежачи", "Груди", "Штанга", 2, 75, 9, 675, 97.5, null, "так", null],
+      [d1, "Push", "Махи в тренажері", "Плечі", "Тренажер", 1, 40, 10, 400, 53.3, null, "так", null],
+      [d2, "Жим — Push", "Жим штанги лежачи", "Груди", "Штанга", 1, 80, 10, 800, 106.7, "🏆 Рекорд", "так", "плече"],
+      [d2, "Жим — Push", "Жим штанги лежачи", "Груди", "Штанга", 2, 78, 10, 780, 104, null, "так", null],
+      [d2, "Жим — Push", "Жим штанги лежачи", "Груди", "Штанга", 3, 80, 0, null, null, null, "ні", null],
+    ]);
+  });
+
+  it("журнал: оформлення — розділювач тренувань, блоки через одне, рекорд, розвантаження, невиконані", () => {
+    const base = { deload: false, muscleGroup: "chest" };
+    expect(sheets.journalStyle).toEqual([
+      { ...base, firstOfWorkout: true, shaded: false, pr: false, completed: true },
+      { ...base, firstOfWorkout: false, shaded: false, pr: false, completed: true },
+      { firstOfWorkout: false, shaded: false, pr: false, completed: true, deload: true, muscleGroup: "shoulders" },
+      { ...base, firstOfWorkout: true, shaded: true, pr: true, completed: true },
+      { ...base, firstOfWorkout: false, shaded: true, pr: false, completed: true },
+      { ...base, firstOfWorkout: false, shaded: true, pr: false, completed: false },
+    ]);
+  });
+
+  it("тренування — від найновішого: вправ, найважча вага, тривалість як час Excel", () => {
     expect(sheets.workouts).toEqual([
-      ["Дата", "День", "Тривалість, хв", "Підходи", "Тоннаж, кг", "Рекорди", "Нотатка"],
-      [date, "Жим — Push", 65, 2, 1580, 1, "плече"],
+      ["Дата", "День", "Тривалість", "Вправ", "Підходи", "Тоннаж, кг", "Найважча, кг", "Рекорди", "Нотатка"],
+      [d2, "Жим — Push", 65 / 1440, 1, 2, 1580, 80, 1, "плече"],
+      [d1, "Push", 50 / 1440, 2, 3, 1825, 75, 0, "легко"],
     ]);
-    expect(sheets.sets[0]).toEqual(["Дата", "Вправа", "Група", "Підхід", "Вага, кг", "Повт", "1ПМ, кг", "Виконано"]);
-    expect(sheets.sets.slice(1)).toEqual([
-      [date, "Жим штанги лежачи", "Груди", 1, 80, 10, 106.7, "так"],
-      [date, "Жим штанги лежачи", "Груди", 2, 78, 10, 104, "так"],
-      [date, "Жим штанги лежачи", "Груди", 3, 80, 0, null, "ні"],
-    ]);
+  });
+
+  it("рекорди — найкращий рекордний підхід вправи в тренуванні", () => {
     expect(sheets.records).toEqual([
       ["Вправа", "Вага × повт.", "1ПМ, кг", "Дата"],
-      ["Жим штанги лежачи", "80 × 10", 106.7, date],
+      ["Жим штанги лежачи", "80 × 10", 106.7, d2],
+    ]);
+  });
+
+  it("вправи: приріст робочої ваги між першим і останнім тренуванням", () => {
+    expect(sheets.exercises).toEqual([
+      [
+        "Вправа",
+        "Перше",
+        "Остання",
+        "Тренувань",
+        "Найкраще",
+        "Найкращий 1ПМ, кг",
+        "Початок, кг",
+        "Зараз, кг",
+        "Приріст, кг",
+        "Приріст, %",
+      ],
+      ["Жим штанги лежачи", d1, d2, 2, "80 × 10", 106.7, 75, 80, 5, 6.7],
+      ["Махи в тренажері", d1, d1, 1, "40 × 10", 53.3, 40, 40, 0, 0],
     ]);
   });
 
   it("lb: колонки 'Weight, lb', значення перераховані", () => {
-    const sheets = buildExportRows([w], { unit: "lb", locale: "en", labels: { ...labels, sets: { ...labels.sets, weight: "Weight" } } });
-    expect(sheets.sets[0][4]).toBe("Weight, lb");
-    expect(sheets.sets[1][1]).toBe("Bench Press");
-    expect(sheets.sets[1][4]).toBe(176.5); // 80 кг → 176,4 lb → крок 0,5
-    expect(sheets.workouts[1][4]).toBe(3483); // 1580 кг → lb
+    const lb = buildExportRows([w2], {
+      unit: "lb",
+      locale: "en",
+      labels: { ...labels, journal: { ...labels.journal, weight: "Weight" } },
+    });
+    expect(lb.journal[0][6]).toBe("Weight, lb");
+    expect(lb.journal[1][2]).toBe("Bench Press");
+    expect(lb.journal[1][6]).toBe(176.5); // 80 кг → 176,4 lb → крок 0,5
+    expect(lb.workouts[1][5]).toBe(3483); // 1580 кг → lb
+    expect(lb.exercises[1][8]).toBe(0); // одне тренування — приросту немає
   });
 
   it("порожній експорт — лише заголовки; ширина колонок і назва файлу", () => {
-    const sheets = buildExportRows([], { unit: "kg", locale: "uk", labels });
-    expect(sheets.workouts).toHaveLength(1);
+    const empty = buildExportRows([], { unit: "kg", locale: "uk", labels });
+    for (const key of SHEET_ORDER) expect(empty[key]).toHaveLength(1);
+    expect(empty.journalStyle).toEqual([]);
     // дата — 17 символів + 2 запасу; довгий текст обрізається до 60
     expect(columnWidths([["ab", null], [new Date(), "x".repeat(100)]])).toEqual([19, 60]);
     expect(exportFileName("2026-11")).toBe("gainstep-workouts-2026-11.xlsx");
     expect(exportFileName(null)).toBe("gainstep-workouts-all.xlsx");
+  });
+
+  describe("xlsx", () => {
+    const names = { journal: "Журнал", workouts: "Тренування", records: "Рекорди", exercises: "Вправи" };
+    const fillOf = (cell: ExcelJS.Cell) => (cell.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb;
+    // exceljs заповнює це поле при читанні, але не описує його в типах.
+    const cfOf = (sheet: ExcelJS.Worksheet) =>
+      (sheet as unknown as { conditionalFormattings: ExcelJS.ConditionalFormattingOptions[] }).conditionalFormattings;
+    let buffer: ArrayBuffer;
+    let book: ExcelJS.Workbook;
+
+    beforeAll(async () => {
+      buffer = await buildWorkbook(sheets, names, "uk", { total: "Разом" });
+      book = new ExcelJS.Workbook();
+      await book.xlsx.load(buffer);
+    });
+
+    it("аркуші в порядку журналу, кольорові вкладки, заголовок у кольорах GainStep", () => {
+      expect(book.worksheets.map((s) => s.name)).toEqual(["Журнал", "Тренування", "Рекорди", "Вправи"]);
+      expect(book.worksheets.map((s) => s.properties.tabColor?.argb)).toEqual([
+        "FFC6F432",
+        "FF8A8F98",
+        "FFF5C542",
+        "FF64B5F6",
+      ]);
+      for (const sheet of book.worksheets) {
+        const header = sheet.getRow(1);
+        expect(header.height).toBe(24);
+        const cell = header.getCell(1);
+        expect(fillOf(cell)).toBe("FF0E0F11");
+        expect(cell.font).toMatchObject({ bold: true, color: { argb: "FFFFFFFF" } });
+        expect(cell.alignment?.vertical).toBe("middle");
+        expect(cell.border?.bottom).toMatchObject({ style: "thick", color: { argb: "FFC6F432" } });
+        expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
+      }
+    });
+
+    it("журнал: блоки, розділювач, рекорд, розвантаження, невиконані, групи м'язів, data bar", () => {
+      const journal = book.getWorksheet("Журнал")!;
+      expect(journal.autoFilter).toBe("A1:M7");
+      // Рядок 2 — перше тренування (білий блок), дата жирна, текст ліворуч, числа праворуч.
+      const r2 = journal.getRow(2);
+      expect(fillOf(r2.getCell(3))).toBe("FFFFFFFF");
+      expect(r2.getCell(1).font).toMatchObject({ name: "Calibri", size: 11, bold: true });
+      expect(r2.getCell(3).alignment?.horizontal).toBe("left");
+      expect(r2.getCell(7).alignment?.horizontal).toBe("right");
+      // Груди — 20% від #FF8A65 на білому.
+      expect(fillOf(r2.getCell(4))).toBe(tint("#FF8A65"));
+      expect(tint("#FF8A65")).toBe("FFFFE8E0");
+      // Рядок 4 — розвантаження: помаранчева вага.
+      expect(fillOf(journal.getRow(4).getCell(7))).toBe("FFFFE7CC");
+      expect(journal.getRow(4).getCell(7).font?.color?.argb).toBe("FFB35C00");
+      // Рядок 5 — перший підхід другого тренування, рекорд.
+      const r5 = journal.getRow(5);
+      expect(r5.getCell(1).border?.top).toMatchObject({ style: "medium", color: { argb: "FFC6F432" } });
+      expect(fillOf(r5.getCell(3))).toBe("FFEAF8C4");
+      expect(r5.getCell(7).font?.bold).toBe(true);
+      expect(r5.getCell(10).font?.bold).toBe(true);
+      expect(r5.getCell(11).value).toBe("🏆 Рекорд");
+      // Рядок 6 — друге тренування, звичайний підхід: світло-сіро-зелений блок.
+      expect(fillOf(journal.getRow(6).getCell(3))).toBe("FFF4F6F0");
+      // Рядок 7 — невиконаний: сірий курсив.
+      expect(journal.getRow(7).getCell(3).font).toMatchObject({ italic: true, color: { argb: "FFA0A0A0" } });
+      expect(cfOf(journal)).toMatchObject([{ ref: "I2:I7", rules: [{ type: "dataBar" }] }]);
+    });
+
+    it("тренування: data bar тоннажу, рекорди > 0, рядок 'Разом' з формулами", () => {
+      const sheet = book.getWorksheet("Тренування")!;
+      expect(sheet.getColumn(3).numFmt).toBe("[h]:mm");
+      expect(fillOf(sheet.getRow(2).getCell(8))).toBe("FFEAF8C4");
+      expect(sheet.getRow(2).getCell(8).font?.bold).toBe(true);
+      expect(fillOf(sheet.getRow(3).getCell(8))).toBeUndefined();
+      expect(cfOf(sheet)).toMatchObject([{ ref: "F2:F3", rules: [{ type: "dataBar" }] }]);
+      // Автофільтр не захоплює рядок "Разом".
+      expect(sheet.autoFilter).toBe("A1:I3");
+
+      const total = sheet.getRow(4);
+      expect(total.getCell(1).value).toBe("Разом");
+      const avg = total.getCell(3).value as ExcelJS.CellFormulaValue;
+      expect(avg.formula).toBe("AVERAGE(C2:C3)");
+      // Колонка у форматі часу, тож exceljs читає результат як Date: 57,5 хв = 00:57:30.
+      expect((avg.result as unknown as Date).toISOString()).toBe("1899-12-30T00:57:30.000Z");
+      expect(total.getCell(5).value).toMatchObject({ formula: "SUM(E2:E3)", result: 5 });
+      expect(total.getCell(6).value).toMatchObject({ formula: "SUM(F2:F3)", result: 3405 });
+      expect(total.getCell(8).value).toMatchObject({ formula: "SUM(H2:H3)", result: 1 });
+      expect(total.getCell(1).font?.bold).toBe(true);
+      expect(total.getCell(6).border?.top?.style).toBe("medium");
+    });
+
+    it("рекорди: 1ПМ жирний; вправи: ▲/▼ приріст і колірна шкала відсотка", () => {
+      expect(book.getWorksheet("Рекорди")!.getRow(2).getCell(3).font?.bold).toBe(true);
+
+      const ex = book.getWorksheet("Вправи")!;
+      expect(ex.getColumn(9).numFmt).toBe('"▲ "0.0;"▼ "0.0;0');
+      expect(ex.getRow(2).getCell(9).font?.color?.argb).toBe("FF2E7D32"); // +5 кг
+      expect(ex.getRow(3).getCell(9).font?.color?.argb).toBe("FF8A8F98"); // 0
+      expect(cfOf(ex)).toMatchObject([
+        { ref: "J2:J3", rules: [{ type: "colorScale", color: [{ argb: "FFFFFFFF" }, { argb: "FFC6F432" }] }] },
+      ]);
+    });
+
+    it("XML: data bar — класичний + x14 з тим самим id (без порожніх посилань), автофільтр від 1-го рядка", async () => {
+      const zip = await JSZip.loadAsync(buffer);
+      const sheet1 = await zip.file("xl/worksheets/sheet1.xml")!.async("string");
+      // Класична частина — для Excel 2007 / LibreOffice.
+      expect(sheet1).toContain(
+        '<cfRule type="dataBar" priority="1"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FFC6F432"/></dataBar>',
+      );
+      // Посилання на x14-правило має вести на існуюче правило (порожній <x14:id/> Excel лагодить).
+      const ref = /<x14:id>(\{[0-9A-F-]+\})<\/x14:id>/i.exec(sheet1)?.[1];
+      expect(ref).toBeTruthy();
+      expect(sheet1).toContain(`<x14:cfRule type="dataBar" id="${ref}">`);
+      expect(sheet1).not.toContain("<x14:id/>");
+      expect(sheet1).toContain('<autoFilter ref="A1:M7"/>');
+      expect(sheet1).toContain('<tabColor rgb="FFC6F432"/>');
+
+      const sheet4 = await zip.file("xl/worksheets/sheet4.xml")!.async("string");
+      expect(sheet4).toContain(
+        '<cfRule type="colorScale" priority="1"><colorScale><cfvo type="min"/><cfvo type="max"/><color rgb="FFFFFFFF"/><color rgb="FFC6F432"/></colorScale></cfRule>',
+      );
+    });
   });
 });

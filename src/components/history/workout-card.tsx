@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, ChevronRight, Trophy } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Pencil, Trophy } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 import { useWeightFormat } from "@/components/i18n/use-format";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { dateBlock, durationText, exercisesPreview, volumeText } from "./format";
 import { SetsTable } from "./sets-table";
 import { ShareButton } from "./share-button";
+import { WorkoutMenu } from "./workout-actions";
 
 /** Лаймовий блок дати "19 / ЛИС". */
 export function DateBlock({ dayKey, className }: { dayKey: string; className?: string }) {
@@ -93,10 +94,12 @@ function CardSummary({ workout, compact }: { workout: HistoryWorkout; compact?: 
 /**
  * Картка тренування в історії. Телефон — посилання на /workouts/[id];
  * desktop (lg+) — розгортається inline з таблицями підходів і кнопками
- * "Відкрити" / "Поділитися".
+ * "Відкрити" / "Редагувати" / "Поділитися". Праворуч на обох — меню "…"
+ * (Відкрити, Редагувати, Поділитися, Видалити).
  */
 export function WorkoutCard({ workout }: { workout: HistoryWorkout }) {
   const t = useTranslations("history.card");
+  const td = useTranslations("history.detail");
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -109,31 +112,39 @@ export function WorkoutCard({ workout }: { workout: HistoryWorkout }) {
         open && "lg:border-primary/30 lg:shadow-[0_0_0_1px_rgb(198_244_50/0.08)]",
       )}
     >
-      <Link
-        href={href}
-        className="flex items-center gap-3 rounded-[20px] p-3.5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none active:bg-foreground/3 lg:hidden"
-      >
-        <CardSummary workout={workout} compact />
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
-
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="hidden w-full items-center gap-4 rounded-[20px] px-[18px] py-3.5 transition-colors hover:bg-foreground/2 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none lg:flex"
-      >
-        <CardSummary workout={workout} />
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition",
-            open && "border border-foreground/15 text-foreground",
-          )}
+      {/* Телефон: посилання на сторінку + меню "…" поруч (не всередині посилання). */}
+      <div className="flex items-center gap-1 pr-2 lg:hidden">
+        <Link
+          href={href}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-[20px] py-3.5 pl-3.5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none active:bg-foreground/3"
         >
-          <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} aria-hidden />
-        </span>
-      </button>
+          <CardSummary workout={workout} compact />
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
+        <WorkoutMenu workout={workout} variant="card" />
+      </div>
+
+      {/* Desktop: кнопка розгортання + меню "…". */}
+      <div className="hidden items-center gap-1 pr-3 lg:flex">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex min-w-0 flex-1 items-center gap-4 rounded-[20px] py-3.5 pl-[18px] transition-colors hover:bg-foreground/2 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+        >
+          <CardSummary workout={workout} />
+          <span
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition",
+              open && "border border-foreground/15 text-foreground",
+            )}
+          >
+            <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} aria-hidden />
+          </span>
+        </button>
+        <WorkoutMenu workout={workout} variant="card" />
+      </div>
 
       {open && (
         <div id={panelId} className="hidden border-t border-foreground/8 lg:block">
@@ -161,6 +172,13 @@ export function WorkoutCard({ workout }: { workout: HistoryWorkout }) {
             >
               <ArrowUpRight className="size-4" aria-hidden />
               {t("open")}
+            </Link>
+            <Link
+              href={`${href}/edit`}
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-foreground/25 px-5 text-sm font-bold transition hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none active:scale-[0.98]"
+            >
+              <Pencil className="size-4" aria-hidden />
+              {td("edit")}
             </Link>
             <ShareButton workout={workout} />
           </div>
