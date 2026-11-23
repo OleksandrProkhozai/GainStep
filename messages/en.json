@@ -189,7 +189,8 @@
     "exportFailed": "Couldn’t prepare the file. Please try again.",
     "transitionRestRange": "Rest after exercise must be from 0:00 to 15:00",
     "workoutPlanInvalid": "Invalid workout exercise list",
-    "workoutPlanSaveFailed": "Couldn’t save the workout exercise list"
+    "workoutPlanSaveFailed": "Couldn’t save the workout exercise list",
+    "workoutStartFailed": "Couldn’t start the workout. Please try again."
   },
   "auth": {
     "meta": {
@@ -1039,6 +1040,45 @@
         "best": "Best sets",
         "records": "{count, plural, one {# new record} other {# new records}}"
       }
+    }
+  },
+  "offline": {
+    "page": {
+      "metaTitle": "Offline",
+      "title": "No internet connection",
+      "text": "This page isn’t saved on the device yet. Check your connection and try again.",
+      "workoutSaved": "No internet. Your active workout is saved on the device.",
+      "backToWorkout": "Back to workout",
+      "retry": "Try again"
+    },
+    "pill": {
+      "offline": "Offline · {count, plural, =0 {saved on device} one {# set waiting to sync} other {# sets waiting to sync}}",
+      "synced": "Synced",
+      "waitingFinish": "Offline · workout waiting to sync"
+    },
+    "savedOnDevice": "No internet: the workout is saved on the device and will be sent as soon as you’re back online. The comparison with your last session will appear then.",
+    "finishedLocally": "Workout saved on the device",
+    "finishedLocallyText": "It will be sent as soon as you’re back online.",
+    "discardUnavailable": "Can’t discard without internet — try again when you’re online.",
+    "startUnavailable": "Can’t start offline",
+    "startUnavailableText": "Open the dashboard once while online — the program will be saved on the device.",
+    "banner": {
+      "title": "{count, plural, one {A workout is waiting to sync} other {# workouts are waiting to sync}}",
+      "text": "The workout is saved on the device and will be sent as soon as you’re back online."
+    },
+    "finishSynced": "Workout synced",
+    "finishDropped": "Couldn’t sync the workout — it no longer exists on the server"
+  },
+  "pwa": {
+    "shortcutStart": "Start workout",
+    "shortcutStartShort": "Workout",
+    "install": {
+      "title": "App",
+      "row": "Install app",
+      "hint": "Home screen icon, full screen, workouts work offline.",
+      "iosHint": "Tap <share></share> “Share” → <add></add> “Add to Home Screen”.",
+      "shareIcon": "Share",
+      "button": "Install"
     }
   }
 }

@@ -135,6 +135,86 @@ export function toWorkoutExercise(
 
 const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, image_path, owner_id, is_compound";
 
+/** День активної програми, готовий до старту тренування без мережі. */
+export interface OfflineKitDay {
+  id: string;
+  name: string;
+  /** Вправи дня з історією (підказки ваги, "Минулого разу"). */
+  exercises: WorkoutExercise[];
+}
+
+/** Активна програма для офлайн-старту (кешується на клієнті після дашборда). */
+export interface OfflineKit {
+  programId: string;
+  programName: string;
+  days: OfflineKitDay[];
+  /** Коли зібрано, ISO. */
+  loadedAt: string;
+}
+
+/**
+ * Активна програма з днями, вправами та історією — щоб тренування можна
+ * було почати без мережі. Історія — одним запитом для всіх вправ програми.
+ */
+export async function loadOfflineKit(
+  supabase: Client,
+  userId: string,
+  locale = "en",
+): Promise<OfflineKit | null> {
+  const [profileRes, templateNames] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        `program:programs!profiles_active_program_id_fkey (
+           id, name,
+           program_days ( id, name, position,
+             program_exercises ( position, target_sets, rep_min, rep_max, rest_seconds, transition_rest_seconds,
+               exercise:exercises ( ${EXERCISE_COLUMNS} ) ) )
+         )`,
+      )
+      .eq("id", userId)
+      .maybeSingle(),
+    getTemplateNames(supabase),
+  ]);
+  if (profileRes.error) throw profileRes.error;
+  const program = profileRes.data?.program;
+  if (!program) return null;
+
+  const days = [...program.program_days].sort((a, b) => a.position - b.position);
+  const exerciseIds = new Set<string>();
+  for (const d of days) for (const pe of d.program_exercises) if (pe.exercise) exerciseIds.add(pe.exercise.id);
+  const history = await loadExerciseHistory(supabase, [...exerciseIds]);
+
+  return {
+    programId: program.id,
+    programName: templateName(program.name, templateNames, locale),
+    loadedAt: new Date().toISOString(),
+    days: days.map((d) => {
+      const seen = new Set<string>();
+      const exercises: WorkoutExercise[] = [];
+      for (const pe of [...d.program_exercises].sort((a, b) => a.position - b.position)) {
+        if (!pe.exercise || seen.has(pe.exercise.id)) continue;
+        seen.add(pe.exercise.id);
+        exercises.push(
+          toWorkoutExercise(
+            pe.exercise,
+            {
+              targetSets: pe.target_sets,
+              repMin: pe.rep_min,
+              repMax: pe.rep_max,
+              restSeconds: pe.rest_seconds,
+              transitionRestSeconds: pe.transition_rest_seconds,
+              source: "program",
+            },
+            history.get(pe.exercise.id),
+          ),
+        );
+      }
+      return { id: d.id, name: templateName(d.name, templateNames, locale), exercises };
+    }),
+  };
+}
+
 export type LoadWorkoutResult =
   | { kind: "ok"; data: WorkoutInit }
   | { kind: "not-found" }

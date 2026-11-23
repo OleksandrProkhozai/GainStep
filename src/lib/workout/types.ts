@@ -82,6 +82,10 @@ export interface WorkoutInit {
   savedSets: SavedSet[];
   /** У тренування вже є workouts.exercise_plan; false — старе, склад дозаписується. */
   planStored: boolean;
+  /** false — почато без мережі, рядок у workouts створить черга (за замовчуванням true). */
+  created?: boolean;
+  /** День програми (потрібен, щоб створити рядок з черги). */
+  programDayId?: string | null;
 }
 
 /** Параметри за замовчуванням для вправи, доданої під час тренування. */

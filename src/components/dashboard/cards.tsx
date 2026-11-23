@@ -6,7 +6,7 @@ import type { SmartSuggestion } from "@/lib/dashboard/queries";
 import type { Suggestion, SuggestionAction } from "@/lib/progression";
 import { createWeightFormat, type WeightFormat, type WeightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
-import { startWorkout } from "@/lib/workout/actions";
+import { StartWorkoutForm } from "@/components/workout/start-workout-form";
 import { suggestionReason } from "@/lib/workout/suggestion-text";
 import { StartWorkoutButton } from "./start-workout-button";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
@@ -72,9 +72,9 @@ export function TodayCard({
           <p className="mt-1 mb-6 text-sm text-foreground/65 md:mb-0">{t("motivation")}</p>
           {/* Старт — server action (а не посилання): GET-запит, зокрема
               prefetch, не повинен створювати тренування. */}
-          <form action={startWorkout.bind(null, day.id)} className="mt-auto md:mt-6">
+          <StartWorkoutForm dayId={day.id} className="mt-auto md:mt-6">
             <StartWorkoutButton className={cn(pillClass, "w-full disabled:opacity-70 md:w-fit")} />
-          </form>
+          </StartWorkoutForm>
         </>
       ) : (
         <>

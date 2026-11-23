@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { getTranslations } from "next-intl/server";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthForm } from "@/components/auth/auth-form";
+import { ClearUserCaches } from "@/components/pwa/clear-user-caches";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -19,6 +20,7 @@ export const viewport: Viewport = {
 export default function LoginPage() {
   return (
     <AuthShell>
+      <ClearUserCaches />
       {/* AuthForm читає ?mode= — за Cache Components це має бути в Suspense */}
       <Suspense fallback={<AuthFormSkeleton />}>
         <AuthForm />

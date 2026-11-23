@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, use, type ReactNode } from "react";
+import { createContext, Suspense, use, useEffect, type ReactNode } from "react";
+import { offlineStore } from "@/lib/offline/offline-store";
 import type { WeightUnit } from "@/lib/units";
 
 /** Налаштування, потрібні клієнтським компонентам. Джерело — getCurrentUser(). */
@@ -27,7 +28,23 @@ export function PreferencesProvider({
   preferences: Promise<ClientPreferences>;
   children: ReactNode;
 }) {
-  return <PreferencesContext value={preferences}>{children}</PreferencesContext>;
+  return (
+    <PreferencesContext value={preferences}>
+      {children}
+      <Suspense fallback={null}>
+        <RememberPreferences />
+      </Suspense>
+    </PreferencesContext>
+  );
+}
+
+/** Кладе налаштування на пристрій — екран тренування без мережі бере їх звідти. */
+function RememberPreferences() {
+  const preferences = usePreferences();
+  useEffect(() => {
+    offlineStore.getState().setPreferences(preferences);
+  }, [preferences]);
+  return null;
 }
 
 function usePreferences(): ClientPreferences {

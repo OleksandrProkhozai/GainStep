@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { enGB, uk } from "date-fns/locale";
@@ -50,7 +51,18 @@ function formatSets(sets: SummarySet[], fmt: WeightFormat) {
  * "розчиняються" (display: contents), і картки йдуть у порядку макета
  * телефона завдяки order.
  */
-export function SummaryView({ data }: { data: SummaryPageData }) {
+export function SummaryView({
+  data,
+  local,
+}: {
+  data: SummaryPageData;
+  /**
+   * Локальний підсумок (тренування завершене без мережі, ще не на сервері):
+   * повідомлення вгорі; нотатку, історію й редагування не показуємо —
+   * на сервері тренування ще не завершене.
+   */
+  local?: ReactNode;
+}) {
   const { summary, unit } = data;
   const t = useTranslations("summary");
   const tn = useTranslations("nav");
@@ -77,10 +89,11 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
 
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 px-[max(1rem,env(safe-area-inset-left))] pt-1 pb-4 lg:grid lg:max-w-[1240px] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:items-start lg:gap-4 lg:px-6 lg:pt-3 lg:pb-8 xl:gap-5">
         <div className="contents lg:flex lg:flex-col lg:gap-4 xl:gap-5">
+          {local && <div className="max-lg:order-first">{local}</div>}
           <Hero data={data} className="max-lg:order-1" />
           <Stats data={data} className="max-lg:order-2" />
           <ExercisesCard exercises={summary.exercises} unit={unit} className="max-lg:order-4" />
-          <NotesCard workoutId={data.workoutId} initialNotes={data.notes} className="max-lg:order-6" />
+          {!local && <NotesCard workoutId={data.workoutId} initialNotes={data.notes} className="max-lg:order-6" />}
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-4 xl:gap-5">
           <NextTimeCard exercises={summary.exercises} unit={unit} className="max-lg:order-3" />
@@ -92,10 +105,14 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
             <Link href="/" className={cn(pill, "h-12 w-full bg-primary text-base text-primary-foreground hover:bg-primary/90")}>
               {t("done")}
             </Link>
-            <Link href="/workouts/history" className={cn(pill, "h-12 w-full border border-foreground/40 text-base hover:bg-foreground/5")}>
-              {t("viewHistory")}
-            </Link>
-            <FixSetsLink workoutId={data.workoutId} className="self-center" />
+            {!local && (
+              <>
+                <Link href="/workouts/history" className={cn(pill, "h-12 w-full border border-foreground/40 text-base hover:bg-foreground/5")}>
+                  {t("viewHistory")}
+                </Link>
+                <FixSetsLink workoutId={data.workoutId} className="self-center" />
+              </>
+            )}
           </div>
         </div>
       </main>
@@ -106,16 +123,18 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
           <Link href="/" className={cn(pill, "h-14 w-full bg-primary text-base text-primary-foreground")}>
             {t("done")}
           </Link>
-          <div className="mt-1 flex flex-wrap items-center justify-center">
-            <Link
-              href="/workouts/history"
-              className="inline-flex h-11 items-center px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
-            >
-              {t("viewHistory")}
-            </Link>
-            <span aria-hidden className="size-[3px] rounded-full bg-muted-foreground/60" />
-            <FixSetsLink workoutId={data.workoutId} />
-          </div>
+          {!local && (
+            <div className="mt-1 flex flex-wrap items-center justify-center">
+              <Link
+                href="/workouts/history"
+                className="inline-flex h-11 items-center px-4 text-sm font-semibold text-foreground/85 underline-offset-4 hover:underline focus-visible:rounded-lg focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+              >
+                {t("viewHistory")}
+              </Link>
+              <span aria-hidden className="size-[3px] rounded-full bg-muted-foreground/60" />
+              <FixSetsLink workoutId={data.workoutId} />
+            </div>
+          )}
         </div>
       </div>
     </div>

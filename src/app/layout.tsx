@@ -5,9 +5,12 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import { DisableZoom } from "@/components/disable-zoom";
 import { LocaleSync } from "@/components/i18n/locale-sync";
+import { OfflineSync } from "@/components/pwa/offline-sync";
+import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DEFAULT_LOCALE, LOCALE_COOKIE } from "@/i18n/config";
+import { EARLY_INSTALL_SCRIPT } from "@/lib/pwa/install-mode";
 import "./globals.css";
 
 // Кирилиця обов'язкова: інакше українські рядки відмалює системний шрифт.
@@ -28,6 +31,16 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: { default: "GainStep", template: "%s · GainStep" },
     description: t("description"),
+    applicationName: "GainStep",
+    // manifest.webmanifest і favicon.ico Next підключає сам (app/manifest.ts, app/favicon.ico).
+    icons: {
+      icon: [{ url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" }],
+      apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    },
+    // Запуск з екрана "Додому" на iPhone: без рядка Safari, статус-бар
+    // поверх контенту (відступи — env(safe-area-inset-*)).
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "GainStep" },
+    formatDetection: { telephone: false },
   };
 }
 
@@ -63,9 +76,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: LANG_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: EARLY_INSTALL_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <DisableZoom />
+        <ServiceWorkerRegister />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -95,6 +110,7 @@ async function IntlProvider({ children }: { children: React.ReactNode }) {
   return (
     <NextIntlClientProvider>
       <LocaleSync locale={locale} />
+      <OfflineSync />
       {children}
     </NextIntlClientProvider>
   );

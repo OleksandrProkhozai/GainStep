@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { CalendarDays, Dumbbell, Flame, Trophy } from "lucide-react";
 import { ProgressionCard, StatCard, TodayCard } from "@/components/dashboard/cards";
 import { ProgressChart } from "@/components/dashboard/progress-chart";
+import { OfflineQueueBanner } from "@/components/pwa/offline-banner";
+import { OfflineKitSync } from "@/components/pwa/offline-kit-sync";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/lib/dashboard/queries";
@@ -39,6 +41,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4 md:space-y-5">
+      {/* Без мережі: тренування в черзі + кеш програми для офлайн-старту */}
+      <OfflineQueueBanner />
+      <OfflineKitSync />
       <header>
         <h1 className="font-heading text-[26px] leading-tight font-extrabold tracking-tight md:text-[32px]">
           {t.rich("greeting", {

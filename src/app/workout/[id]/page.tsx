@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
+import { CallNotFound, LocalWorkout } from "@/components/workout/local-workout";
 import { WorkoutScreen } from "@/components/workout/workout-screen";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +26,9 @@ export default async function WorkoutPage({ params }: PageProps<"/workout/[id]">
 
   const [supabase, locale] = await Promise.all([createClient(), getLocale()]);
   const result = await loadWorkout(supabase, id, user.id, locale);
-  if (result.kind === "not-found") notFound();
+  // Немає в базі — можливо, почате без мережі й ще не синхронізоване:
+  // екран зі стору пристрою (черга створить рядок), інакше 404.
+  if (result.kind === "not-found") return <LocalWorkout workoutId={id} onlyUncreated fallback={<CallNotFound />} />;
   if (result.kind === "completed") redirect(`/workout/${id}/summary`);
 
   return <WorkoutScreen init={result.data} />;

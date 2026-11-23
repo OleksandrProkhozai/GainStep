@@ -3,7 +3,7 @@ import { useTranslations } from "next-intl";
 import { StartWorkoutButton } from "@/components/dashboard/start-workout-button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { startWorkout } from "@/lib/workout/actions";
+import { StartWorkoutForm } from "@/components/workout/start-workout-form";
 import type { HubDay } from "@/lib/workout/hub-queries";
 
 const startClass =
@@ -64,9 +64,9 @@ export function DayCard({ day, blocked }: { day: HubDay; blocked: boolean }) {
             </Tooltip>
           </TooltipProvider>
         ) : (
-          <form action={startWorkout.bind(null, day.id)}>
+          <StartWorkoutForm dayId={day.id}>
             <StartWorkoutButton label={t("startShort")} className={startClass} />
-          </form>
+          </StartWorkoutForm>
         )}
       </div>
     </article>

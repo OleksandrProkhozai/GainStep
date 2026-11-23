@@ -54,8 +54,24 @@ export interface RestTimer {
 
 export type SyncStatus = "saved" | "saving" | "offline";
 
+/** Шапка тренування — щоб екран будувався зі стору без мережі. */
+export interface WorkoutMeta {
+  name: string;
+  programName: string | null;
+  startedAt: string;
+}
+
 export interface WorkoutState {
   workoutId: string;
+  meta: WorkoutMeta;
+  /**
+   * false — тренування почато без мережі: рядка в workouts ще немає,
+   * його створить черга синхронізації перед першими підходами.
+   * Старі збережені стани без поля — true (рядок створив сервер).
+   */
+  created: boolean;
+  /** День програми — для створення рядка з черги. */
+  programDayId: string | null;
   exercises: WorkoutExercise[];
   sets: WorkoutSet[];
   currentIndex: number;
@@ -99,6 +115,8 @@ export interface WorkoutActions {
   /** Позначки синхронізації (викликає модуль sync). */
   ackSynced: (snapshot: Record<string, number>) => void;
   setSyncStatus: (status: SyncStatus) => void;
+  /** Рядок у workouts створено (черга синхронізації). */
+  markCreated: () => void;
 }
 
 export type WorkoutStore = ReturnType<typeof createWorkoutStore>;
@@ -111,16 +129,102 @@ export function storageKey(workoutId: string) {
   return `${STORAGE_PREFIX}${workoutId}`;
 }
 
-/** Прибирає збережені стани інших (уже завершених чи скасованих) тренувань. */
-export function purgeOtherWorkouts(workoutId: string) {
+/**
+ * Прибирає збережені стани інших (уже завершених чи скасованих) тренувань.
+ * keep — тренування, які лишаються: поточне й ті, що чекають відправки
+ * завершення (їхні підходи ще не на сервері).
+ */
+export function purgeOtherWorkouts(keep: string | readonly string[]) {
   try {
-    const keep = storageKey(workoutId);
+    const keys = new Set((typeof keep === "string" ? [keep] : keep).map(storageKey));
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key?.startsWith(STORAGE_PREFIX) && key !== keep) localStorage.removeItem(key);
+      if (key?.startsWith(STORAGE_PREFIX) && !keys.has(key)) localStorage.removeItem(key);
     }
   } catch {
     // localStorage недоступний (приватний режим) — не критично
+  }
+}
+
+/** Збережений стан тренування (те, що partialize кладе в localStorage). */
+export type PersistedWorkout = Pick<
+  WorkoutState,
+  "workoutId" | "exercises" | "sets" | "currentIndex" | "notes" | "pending"
+> &
+  Partial<Pick<WorkoutState, "meta" | "created" | "programDayId">>;
+
+/**
+ * Збережений стан тренування з localStorage без створення стору
+ * (офлайн-екран, глобальна черга). null — немає або пошкоджений.
+ */
+export function readPersistedWorkout(workoutId: string): PersistedWorkout | null {
+  try {
+    return parsePersistedWorkout(localStorage.getItem(storageKey(workoutId)), workoutId);
+  } catch {
+    return null;
+  }
+}
+
+/** Розбір JSON persist-middleware ({ state, version }) — чиста функція. */
+export function parsePersistedWorkout(raw: string | null, workoutId: string): PersistedWorkout | null {
+  if (!raw) return null;
+  try {
+    const state = (JSON.parse(raw) as { state?: Partial<PersistedWorkout> } | null)?.state;
+    if (
+      !state ||
+      state.workoutId !== workoutId ||
+      !Array.isArray(state.exercises) ||
+      state.exercises.length === 0 ||
+      !Array.isArray(state.sets)
+    ) {
+      return null;
+    }
+    return {
+      meta: state.meta,
+      created: state.created,
+      programDayId: state.programDayId,
+      workoutId,
+      exercises: state.exercises,
+      sets: state.sets,
+      currentIndex: state.currentIndex ?? 0,
+      notes: state.notes ?? "",
+      pending: state.pending ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Початкові дані екрана зі збереженого стану (без сервера). Підходи й
+ * решта стану підтягнуться при rehydrate, тож savedSets порожні.
+ * Старі стани без meta: назва — fallbackName, старт — перший виконаний підхід.
+ */
+export function initFromPersisted(state: PersistedWorkout, fallbackName: string): WorkoutInit {
+  const firstDone = state.sets
+    .map((s) => s.completedAt)
+    .filter((t): t is string => Boolean(t))
+    .sort()[0];
+  return {
+    workoutId: state.workoutId,
+    name: state.meta?.name ?? fallbackName,
+    programName: state.meta?.programName ?? null,
+    startedAt: state.meta?.startedAt ?? firstDone ?? new Date().toISOString(),
+    notes: state.notes,
+    exercises: state.exercises,
+    savedSets: [],
+    planStored: true,
+    created: state.created ?? true,
+    programDayId: state.programDayId ?? null,
+  };
+}
+
+/** Прибирає збережений стан тренування (після завершення або скасування). */
+export function removePersistedWorkout(workoutId: string) {
+  try {
+    localStorage.removeItem(storageKey(workoutId));
+  } catch {
+    // недоступний localStorage — нічого прибирати
   }
 }
 
@@ -155,6 +259,9 @@ export function createWorkoutStore(init: WorkoutInit) {
 
         return {
           workoutId: init.workoutId,
+          meta: { name: init.name, programName: init.programName, startedAt: init.startedAt },
+          created: init.created ?? true,
+          programDayId: init.programDayId ?? null,
           exercises: init.exercises,
           sets: buildSets(init.exercises, init.savedSets),
           currentIndex: 0,
@@ -345,6 +452,8 @@ export function createWorkoutStore(init: WorkoutInit) {
             }),
 
           setSyncStatus: (syncStatus) => set({ syncStatus }),
+
+          markCreated: () => set({ created: true }),
         };
       },
       {
@@ -357,6 +466,9 @@ export function createWorkoutStore(init: WorkoutInit) {
           void syncStatus;
           return {
             workoutId: rest.workoutId,
+            meta: rest.meta,
+            created: rest.created,
+            programDayId: rest.programDayId,
             exercises: rest.exercises,
             sets: rest.sets,
             currentIndex: rest.currentIndex,

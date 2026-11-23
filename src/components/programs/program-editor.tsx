@@ -49,7 +49,7 @@ import {
   saveProgramSchema,
 } from "@/lib/programs/schema";
 import { cn } from "@/lib/utils";
-import { startWorkout } from "@/lib/workout/actions";
+import { StartWorkoutForm } from "@/components/workout/start-workout-form";
 import { ExerciseRow } from "./exercise-row";
 import { ProgramThumb } from "./program-thumb";
 import { NameDialog } from "./name-dialog";
@@ -470,7 +470,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
   );
 }
 
-/** «Start {Day} day» → наявний startWorkout. Неактивна, поки є незбережені зміни. */
+/** «Start {Day} day» → StartWorkoutForm (startWorkout; без мережі — на пристрої). Неактивна, поки є незбережені зміни. */
 function StartDay({
   dayId,
   dayName,
@@ -498,12 +498,12 @@ function StartDay({
     );
   }
   return (
-    <form action={startWorkout.bind(null, dayId)} className="mt-4">
+    <StartWorkoutForm dayId={dayId} className="mt-4">
       <PendingButton size="lg" className="w-full">
         <Play className="size-4 fill-current" aria-hidden />
         {label}
       </PendingButton>
-    </form>
+    </StartWorkoutForm>
   );
 }
 

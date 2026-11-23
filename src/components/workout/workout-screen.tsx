@@ -1,22 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { unstable_rethrow, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
+import { ConnectionPill } from "@/components/pwa/connection-pill";
 import { exerciseName } from "@/lib/i18n/names";
 import { useStore } from "zustand";
 import { useMinRest, useTransitionRestEnabled, useUnit } from "@/components/preferences/preferences-provider";
+import { completeFinish, sendFinishOnce } from "@/lib/offline/flush";
+import { offlineStore, useOffline } from "@/lib/offline/offline-store";
+import type { FinishTask } from "@/lib/offline/outbox";
 import { createClient } from "@/lib/supabase/client";
-import { discardWorkout, finishWorkout, saveExercisePlan } from "@/lib/workout/actions";
+import { discardWorkout } from "@/lib/workout/actions";
 import { firstPending, planRest } from "@/lib/workout/derive";
 import { createWorkoutStore, purgeOtherWorkouts, type WorkoutStore } from "@/lib/workout/store";
-import { createSyncer, type SavePlan } from "@/lib/workout/sync";
+import { createSyncer } from "@/lib/workout/sync";
+import { createWorkoutRow, savePlan } from "@/lib/workout/sync-actions";
 import type { WorkoutInit } from "@/lib/workout/types";
 import { ScreenContext, WorkoutStoreContext, type ScreenApi } from "./context";
 import { DesktopView } from "./desktop-view";
 import { AddExerciseDialog, ConfirmDialog, NoteDialog, RemoveExerciseDialog } from "./dialogs";
 import { playRestOverSound, primeAudio, useIsDesktop, useWakeLock } from "./hooks";
+import { LocalSummary } from "./local-summary";
 import { MobileView } from "./mobile-view";
 import { WorkoutSkeleton } from "./workout-skeleton";
 
@@ -25,33 +32,43 @@ const REST_ALERT_WINDOW_MS = 60_000;
 /** Скільки висить toast "Вправу прибрано" з кнопкою "Повернути". */
 const UNDO_MS = 5_000;
 
-/** Склад тренування → server action; помилка (і офлайн) — throw, черга повторить. */
-const savePlan: SavePlan = async (workoutId, plan) => {
-  const result = await saveExercisePlan(workoutId, plan);
-  if (!result.ok) throw new Error(result.error);
-};
-
 /**
  * Екран активного тренування (клієнтська частина).
  * Стан — у Zustand-сторі з persist у localStorage (ключ за id тренування),
  * тому перезавантаження сторінки нічого не губить. Підходи синхронізуються
  * з workout_sets у фоні; черга переживає офлайн.
+ *
+ * Без мережі екран будується з того самого стору (init — зі збереженого
+ * стану, див. LocalWorkout). Завершене без мережі тренування стоїть у черзі
+ * завершень — замість екрана показується локальний підсумок.
  */
 export function WorkoutScreen({ init }: { init: WorkoutInit }) {
   const [store] = useState(() => createWorkoutStore(init));
   const [hydrated, setHydrated] = useState(false);
+  const finishTask = useOffline((s) => s.finishes.find((f) => f.workoutId === init.workoutId) ?? null);
 
   useEffect(() => {
-    purgeOtherWorkouts(init.workoutId);
+    // Стани тренувань, що чекають відправки завершення, не чіпаємо.
+    const queued = offlineStore.getState().finishes.map((f) => f.workoutId);
+    purgeOtherWorkouts([init.workoutId, ...queued]);
     const unsub = store.persist.onFinishHydration(() => setHydrated(true));
     void store.persist.rehydrate();
     return unsub;
   }, [store, init.workoutId]);
 
+  // Активне тренування на пристрої — для «Повернутись до тренування» без мережі.
+  useEffect(() => {
+    if (!finishTask) offlineStore.getState().setActive({ workoutId: init.workoutId, name: init.name });
+  }, [finishTask, init.workoutId, init.name]);
+
   if (!hydrated) return <WorkoutSkeleton />;
   return (
     <WorkoutStoreContext.Provider value={store}>
-      <Screen store={store} init={init} />
+      {finishTask ? (
+        <LocalSummary store={store} task={finishTask} programName={init.programName} />
+      ) : (
+        <Screen store={store} init={init} />
+      )}
     </WorkoutStoreContext.Provider>
   );
 }
@@ -66,10 +83,12 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   // "Довший відпочинок між вправами" — так само читається в момент старту таймера.
   const transitionRestEnabled = useTransitionRestEnabled();
   const t = useTranslations("workout");
+  const tOffline = useTranslations("offline");
   const locale = useLocale();
   const errorText = useErrorText();
   const isDesktop = useIsDesktop();
-  const [syncer] = useState(() => createSyncer(store, createClient(), savePlan));
+  const router = useRouter();
+  const [syncer] = useState(() => createSyncer(store, createClient(), savePlan, createWorkoutRow));
   const [dialog, setDialog] = useState<null | "finish" | "discard" | "add" | "note">(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   /** Вправа, прибирання якої треба підтвердити (є виконані підходи). */
@@ -87,7 +106,12 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   // ── Синхронізація: кожна зміна черги → відкладена відправка;
   //    'online' і періодична повторна спроба — для офлайну.
   useEffect(() => {
-    if (Object.keys(store.getState().pending).length > 0) void syncer.flush();
+    // Є що відправити: зміни в черзі або тренування почато без мережі.
+    const hasWork = () => {
+      const s = store.getState();
+      return Object.keys(s.pending).length > 0 || !s.created;
+    };
+    if (hasWork()) void syncer.flush();
     const unsub = store.subscribe((state, prev) => {
       if (state.pending !== prev.pending && Object.keys(state.pending).length > 0) {
         syncer.schedule();
@@ -95,12 +119,12 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
     });
     const onOnline = () => void syncer.flush();
     const onOffline = () => {
-      if (Object.keys(store.getState().pending).length > 0) store.getState().setSyncStatus("offline");
+      if (hasWork()) store.getState().setSyncStatus("offline");
     };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     const retry = setInterval(() => {
-      if (Object.keys(store.getState().pending).length > 0) void syncer.flush();
+      if (hasWork()) void syncer.flush();
     }, 20_000);
     return () => {
       unsub();
@@ -159,37 +183,76 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
     [store, t, locale, minRest, transitionRestEnabled],
   );
 
+  /**
+   * Завершення. З мережею — відправити підходи й finishWorkout, потім
+   * підсумок із сервера. Без мережі (або якщо запит не дійшов) — у чергу
+   * завершень: WorkoutScreen покаже локальний підсумок, а фонова черга
+   * відправить усе, щойно з'явиться мережа. Помилка, яку повернув сервер, —
+   * тост, тренування триває (як і раніше).
+   */
   const finish = useCallback(() => {
     startFinishing(async () => {
-      const synced = await syncer.flush();
-      if (!synced) {
-        toast.error(t("toast.notSynced"), {
-          description: t("toast.notSyncedText"),
-        });
-        return;
-      }
-      // Стор чистимо до виклику: дія завершується редіректом на підсумок.
-      store.persist.clearStorage();
-      const result = await finishWorkout(init.workoutId, store.getState().notes);
-      if (result?.error) {
-        // Повертаємо стан у localStorage — тренування триває.
-        store.setState({});
-        toast.error(errorText(result.error));
+      const state = store.getState();
+      const task: FinishTask = {
+        workoutId: init.workoutId,
+        name: init.name,
+        notes: state.notes,
+        finishedAt: new Date().toISOString(),
+      };
+      const queueLocally = () => {
+        state.stopRest();
+        syncer.cancel();
+        offlineStore.getState().queueFinish(task);
+        toast.success(tOffline("finishedLocally"), { description: tOffline("finishedLocallyText") });
+      };
+      if (!navigator.onLine) return queueLocally();
+
+      const attempt = await sendFinishOnce(task, { syncSets: () => syncer.flush(), complete: completeFinish });
+      if (!attempt) return;
+      if (attempt.kind === "done") {
+        router.replace(`/workout/${init.workoutId}/summary`);
+      } else if (attempt.kind === "drop") {
+        toast.error(errorText(attempt.error));
+        router.replace("/");
+      } else if (attempt.error) {
+        toast.error(errorText(attempt.error));
+      } else {
+        queueLocally();
       }
     });
-  }, [store, syncer, init.workoutId, t, errorText]);
+  }, [store, syncer, init.workoutId, init.name, tOffline, errorText, router]);
 
   const discard = useCallback(() => {
     startFinishing(async () => {
       syncer.cancel();
+      const localOnly = !store.getState().created;
+      if (!navigator.onLine) {
+        // Почате без мережі й ще не відправлене — скасовуємо лише на пристрої.
+        if (!localOnly) {
+          toast.error(tOffline("discardUnavailable"));
+          return;
+        }
+        store.persist.clearStorage();
+        offlineStore.getState().clearActive(init.workoutId);
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- без мережі потрібна документна навігація: сторінку віддає service worker
+        window.location.assign("/");
+        return;
+      }
       store.persist.clearStorage();
-      const result = await discardWorkout(init.workoutId);
-      if (result?.error) {
+      offlineStore.getState().clearActive(init.workoutId);
+      try {
+        const result = await discardWorkout(init.workoutId);
+        if (result?.error) {
+          store.setState({});
+          toast.error(errorText(result.error));
+        }
+      } catch (error) {
+        unstable_rethrow(error);
         store.setState({});
-        toast.error(errorText(result.error));
+        toast.error(tOffline("discardUnavailable"));
       }
     });
-  }, [store, syncer, init.workoutId, errorText]);
+  }, [store, syncer, init.workoutId, tOffline, errorText]);
 
   // ── Прибирання вправи: з виконаними підходами — через підтвердження,
   //    без них — одразу, з "Повернути" в toast.
@@ -310,6 +373,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   return (
     <ScreenContext.Provider value={api}>
       {isDesktop ? <DesktopView /> : <MobileView sheetOpen={sheetOpen} onSheetOpenChange={setSheetOpen} />}
+      <ConnectionPill store={store} />
 
       <ConfirmDialog
         open={dialog === "finish"}

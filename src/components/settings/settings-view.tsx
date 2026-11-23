@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { Check, Download, Loader2, Minus, Plus, Share, SquarePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { PendingButton } from "@/components/programs/pending-button";
+import { promptInstall } from "@/components/pwa/install-prompt";
+import { useInstallMode } from "@/components/pwa/use-install-mode";
+import { clearUserDeviceData } from "@/lib/offline/clear";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -71,6 +74,7 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
       <h1 className="font-heading text-[26px] leading-tight font-extrabold tracking-tight md:text-[32px]">{t("title")}</h1>
       <ProfileCard initial={initial} />
       <PreferencesCard initial={initial} />
+      <InstallAppCard />
       <AccountCard email={initial.email} />
       <div className="flex justify-center pt-1 pb-2">
         <button
@@ -478,6 +482,51 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
   );
 }
 
+// ───────────── Install app ─────────────
+
+/**
+ * "Встановити застосунок": кнопка (Chrome / Android — подія
+ * beforeinstallprompt) або підказка для Safari на iPhone. Уже встановлено
+ * (display-mode: standalone) або браузер не вміє — картки немає.
+ */
+function InstallAppCard() {
+  const t = useTranslations("pwa.install");
+  const mode = useInstallMode();
+  const [pending, startTransition] = useTransition();
+  if (mode !== "prompt" && mode !== "ios") return null;
+
+  return (
+    <SettingsCard title={t("title")}>
+      <div className="flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element -- іконка застосунку, 48 px */}
+        <img src="/icons/icon-192.png" alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground/85">{t("row")}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {mode === "ios"
+              ? t.rich("iosHint", {
+                  share: () => <Share className="inline size-3.5 -translate-y-px text-accent-text" aria-label={t("shareIcon")} />,
+                  add: () => <SquarePlus className="inline size-3.5 -translate-y-px text-accent-text" aria-hidden />,
+                })
+              : t("hint")}
+          </p>
+        </div>
+        {mode === "prompt" && (
+          <Button
+            size="sm"
+            disabled={pending}
+            className="shrink-0 rounded-full px-4 font-semibold"
+            onClick={() => startTransition(async () => void (await promptInstall()))}
+          >
+            {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
+            {t("button")}
+          </Button>
+        )}
+      </div>
+    </SettingsCard>
+  );
+}
+
 // ───────────── Account ─────────────
 
 function AccountCard({ email }: { email: string | null }) {
@@ -525,7 +574,8 @@ function DeleteAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         toast.error(errorText(result.error));
         return;
       }
-      purgeOtherWorkouts(""); // локальні чернетки тренувань цього акаунта
+      purgeOtherWorkouts([]); // локальні чернетки тренувань цього акаунта
+      void clearUserDeviceData();
       toast.success(t("deleted"));
       router.replace("/login");
     });

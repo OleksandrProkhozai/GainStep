@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { saveProgramSchema } from "@/lib/programs/schema";
@@ -13,6 +14,7 @@ import {
   planChanges,
   planFromDay,
 } from "./plan";
+import { loadOfflineKit, type OfflineKit } from "./queries";
 
 /** error — код повідомлення (errors.*); текст підставляє клієнт. */
 export type WorkoutActionResult = { error: string };
@@ -76,31 +78,56 @@ export async function startWorkout(programDayId: string, _formData?: FormData) {
   redirect(`/workout/${workout.id}`);
 }
 
+/** Час з клієнта (ISO з поясом); некоректний — ігнорується. */
+const clientTimeSchema = z.iso.datetime({ offset: true });
+
+/**
+ * Час події з пристрою (тренування могли завершити / почати без мережі
+ * годину тому): не в майбутньому і не раніше за `notBefore`.
+ */
+function clampClientTime(value: string | undefined, notBefore?: string) {
+  const now = Date.now();
+  const parsed = clientTimeSchema.safeParse(value);
+  let ms = parsed.success ? Date.parse(parsed.data) : now;
+  if (!Number.isFinite(ms) || ms > now) ms = now;
+  if (notBefore) ms = Math.max(ms, Date.parse(notBefore));
+  return new Date(ms).toISOString();
+}
+
+export type FinishResult = { ok: true } | { ok: false; error: string };
+
 /**
  * Завершення тренування. Клієнт викликає дію лише після того, як
- * відправив чергу підходів. Невиконані підходи видаляються — в історію
- * (і в алгоритм прогресії) потрапляють лише виконані.
+ * відправив чергу підходів (зокрема з офлайн-черги, коли з'явилась мережа).
+ * Невиконані підходи видаляються — в історію (і в алгоритм прогресії)
+ * потрапляють лише виконані.
+ *
+ * Ідемпотентно за id: уже завершене тренування — { ok: true } без змін,
+ * тож повторна відправка з черги безпечна. Без redirect — навігацію
+ * робить клієнт (з черги дія викликається у фоні).
+ * finishedAt — коли користувач натиснув "Завершити" (могло бути офлайн).
  */
 export async function finishWorkout(
   workoutId: string,
   notes: string,
-): Promise<WorkoutActionResult> {
+  finishedAt?: string,
+): Promise<FinishResult> {
   const { supabase, userId } = await requireUser();
-  if (!idSchema.safeParse(workoutId).success) return { error: "workoutNotFound" };
-  const parsedNotes = notesSchema.safeParse(notes.trim());
-  if (!parsedNotes.success) return { error: "notesTooLong" };
+  if (!idSchema.safeParse(workoutId).success) return { ok: false, error: "workoutNotFound" };
+  const parsedNotes = notesSchema.safeParse(typeof notes === "string" ? notes.trim() : "");
+  if (!parsedNotes.success) return { ok: false, error: "notesTooLong" };
 
   const { data: workout, error: loadError } = await supabase
     .from("workouts")
-    .select("id, status")
+    .select("id, status, started_at")
     .eq("id", workoutId)
     .eq("user_id", userId)
     .maybeSingle();
   if (loadError) {
     console.error("finishWorkout: load", loadError);
-    return { error: "workoutFinishFailed" };
+    return { ok: false, error: "workoutFinishFailed" };
   }
-  if (!workout) return { error: "workoutNotFound" };
+  if (!workout) return { ok: false, error: "workoutNotFound" };
 
   if (workout.status === "in_progress") {
     const { error: deleteError } = await supabase
@@ -110,27 +137,106 @@ export async function finishWorkout(
       .eq("is_completed", false);
     if (deleteError) {
       console.error("finishWorkout: delete sets", deleteError);
-      return { error: "workoutFinishFailed" };
+      return { ok: false, error: "workoutFinishFailed" };
     }
 
     const { error: updateError } = await supabase
       .from("workouts")
       .update({
         status: "completed",
-        finished_at: new Date().toISOString(),
+        finished_at: clampClientTime(finishedAt, workout.started_at),
         notes: parsedNotes.data || null,
       })
-      .eq("id", workoutId);
+      .eq("id", workoutId)
+      .eq("status", "in_progress");
     if (updateError) {
       console.error("finishWorkout: update", updateError);
-      return { error: "workoutFinishFailed" };
+      return { ok: false, error: "workoutFinishFailed" };
     }
   }
 
   revalidatePath("/");
   revalidatePath("/workouts");
   revalidatePath("/progress");
-  redirect(`/workout/${workoutId}/summary`);
+  revalidatePath(`/workout/${workoutId}/summary`);
+  return { ok: true };
+}
+
+const createWorkoutSchema = z.object({
+  id: z.guid(),
+  programDayId: z.guid().nullable(),
+  name: z.string().trim().min(1).max(80),
+  startedAt: z.string(),
+});
+
+/**
+ * Створення рядка тренування, почато без мережі (id згенеровано на
+ * клієнті через crypto.randomUUID). Викликає черга синхронізації перед
+ * першими підходами. Ідемпотентно: рядок з таким id уже є — нічого не
+ * робимо (insert … on conflict do nothing).
+ * Назва й склад — з дня програми (як у startWorkout); якщо день уже
+ * видалено — назва з клієнта, склад дозапише черга (saveExercisePlan).
+ */
+export async function createWorkout(input: {
+  id: string;
+  programDayId: string | null;
+  name: string;
+  startedAt: string;
+}): Promise<PlanActionResult> {
+  const { supabase, userId } = await requireUser();
+  const parsed = createWorkoutSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "workoutNotFound" };
+  const { id, programDayId, name, startedAt } = parsed.data;
+
+  const { data: day, error: dayError } = programDayId
+    ? await supabase
+        .from("program_days")
+        .select("id, name, program_exercises ( position, exercise_id, target_sets, rep_min, rep_max, rest_seconds )")
+        .eq("id", programDayId)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (dayError) {
+    console.error("createWorkout: day", dayError);
+    return { ok: false, error: "workoutStartFailed" };
+  }
+
+  const plan = day ? planFromDay([...day.program_exercises].sort((a, b) => a.position - b.position)) : [];
+  const { error } = await supabase.from("workouts").upsert(
+    {
+      id,
+      user_id: userId,
+      name: day?.name ?? name,
+      program_day_id: day?.id ?? null,
+      status: "in_progress",
+      started_at: clampClientTime(startedAt),
+      exercise_plan: plan.length > 0 ? plan : null,
+    },
+    { onConflict: "id", ignoreDuplicates: true },
+  );
+  if (error) {
+    console.error("createWorkout", error);
+    return { ok: false, error: "workoutStartFailed" };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/workouts");
+  return { ok: true };
+}
+
+/**
+ * Дані активної програми для старту тренування без мережі: дні з
+ * вправами та історією (підказки ваги, "Минулого разу"). Клієнт кладе
+ * їх у localStorage після відвідин дашборда. null — програми немає.
+ */
+export async function getOfflineKit(): Promise<OfflineKit | null> {
+  const { supabase, userId } = await requireUser();
+  const locale = await getLocale();
+  try {
+    return await loadOfflineKit(supabase, userId, locale);
+  } catch (error) {
+    console.error("getOfflineKit", error);
+    return null;
+  }
 }
 
 export type NotesActionResult = { ok: true; notes: string } | { ok: false; error: string };

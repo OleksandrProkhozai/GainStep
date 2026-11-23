@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database.types";
 
-/** Маршрути, доступні без сесії. */
-const PUBLIC_PATHS = ["/login", "/forgot-password"];
+/** Маршрути, доступні без сесії (/offline — офлайн-фолбек service worker'а). */
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/offline"];
 const PUBLIC_PREFIXES = ["/auth/"];
 
 function isPublicPath(pathname: string) {
