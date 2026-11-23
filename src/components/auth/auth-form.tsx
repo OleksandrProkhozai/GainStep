@@ -62,7 +62,24 @@ export function AuthForm() {
       )}
 
       {isSignUp ? <SignUpForm /> : <SignInForm />}
+      <LegalLinks />
     </>
+  );
+}
+
+/** Посилання на політику конфіденційності та умови (потрібні для Google OAuth). */
+function LegalLinks() {
+  const t = useTranslations("auth");
+  return (
+    <p className="mt-5 text-center text-xs text-white/40 md:mt-6">
+      <Link href="/privacy" className="underline-offset-2 hover:text-white/70 hover:underline">
+        {t("privacyLink")}
+      </Link>{" "}
+      {t("legalAnd")}{" "}
+      <Link href="/terms" className="underline-offset-2 hover:text-white/70 hover:underline">
+        {t("termsLink")}
+      </Link>
+    </p>
   );
 }
 

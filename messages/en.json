@@ -247,7 +247,10 @@
     "messages": {
       "checkEmail": "Check your email to confirm your account",
       "checkEmailReset": "Check your email"
-    }
+    },
+    "privacyLink": "Privacy Policy",
+    "termsLink": "Terms",
+    "legalAnd": "and"
   },
   "onboarding": {
     "metaTitle": "Get started",
@@ -1080,5 +1083,11 @@
       "shareIcon": "Share",
       "button": "Install"
     }
+  },
+  "legal": {
+    "home": "Back to home",
+    "updated": "Last updated: {date}",
+    "privacyTitle": "Privacy Policy",
+    "termsTitle": "Terms of Use"
   }
 }

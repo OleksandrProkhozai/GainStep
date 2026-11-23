@@ -247,7 +247,10 @@
     "messages": {
       "checkEmail": "Перевірте пошту, щоб підтвердити акаунт",
       "checkEmailReset": "Перевірте пошту"
-    }
+    },
+    "privacyLink": "Політика конфіденційності",
+    "termsLink": "Умови",
+    "legalAnd": "і"
   },
   "onboarding": {
     "metaTitle": "Початок роботи",
@@ -1080,5 +1083,11 @@
       "shareIcon": "Поділитися",
       "button": "Встановити"
     }
+  },
+  "legal": {
+    "home": "На головну",
+    "updated": "Оновлено: {date}",
+    "privacyTitle": "Політика конфіденційності",
+    "termsTitle": "Умови використання"
   }
 }
