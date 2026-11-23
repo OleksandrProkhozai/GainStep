@@ -32,6 +32,8 @@ const ex = (n: number, overrides: Partial<DraftExercise> = {}): DraftExercise =>
   repMin: 8,
   repMax: 12,
   restSeconds: 90,
+  isCompound: false,
+  transitionRestSeconds: null,
   ...overrides,
 });
 
@@ -168,14 +170,14 @@ describe("buildSavePayload / describeChanges", () => {
           id: uuid(1),
           name: "Push",
           exercises: [
-            { id: uuid(102), exercise_id: uuid(202), target_sets: 3, rep_min: 8, rep_max: 10, rest_seconds: 90 },
-            { id: uuid(101), exercise_id: uuid(201), target_sets: 3, rep_min: 8, rep_max: 12, rest_seconds: 90 },
+            { id: uuid(102), exercise_id: uuid(202), target_sets: 3, rep_min: 8, rep_max: 10, rest_seconds: 90, transition_rest_seconds: null },
+            { id: uuid(101), exercise_id: uuid(201), target_sets: 3, rep_min: 8, rep_max: 12, rest_seconds: 90, transition_rest_seconds: null },
           ],
         },
         {
           id: null,
           name: "Legs",
-          exercises: [{ id: null, exercise_id: uuid(207), target_sets: 3, rep_min: 8, rep_max: 12, rest_seconds: 90 }],
+          exercises: [{ id: null, exercise_id: uuid(207), target_sets: 3, rep_min: 8, rep_max: 12, rest_seconds: 90, transition_rest_seconds: null }],
         },
       ],
     });
@@ -207,5 +209,53 @@ describe("buildSavePayload / describeChanges", () => {
     expect(isDraftDirty(original, back)).toBe(false);
     const rekeyed = { ...original, days: original.days.map((x) => ({ ...x, key: `${x.key}-new` })) };
     expect(isDraftDirty(original, rekeyed)).toBe(false);
+  });
+});
+
+describe("перехідний відпочинок у редакторі", () => {
+  const day = [
+    { targetSets: 4, restSeconds: 120, isCompound: true, transitionRestSeconds: null },
+    { targetSets: 3, restSeconds: 90, isCompound: false, transitionRestSeconds: null },
+    { targetSets: 3, restSeconds: 90, isCompound: false, transitionRestSeconds: null },
+  ];
+
+  it("estimateDayMinutes: переходи після кожної вправи, крім останньої", () => {
+    // без переходів: 4 × 160 + 3 × 130 + 3 × 130 = 1420 с ≈ 23.7 хв → 25
+    expect(estimateDayMinutes(day, 0, false)).toBe(25);
+    // базова: +300 − 120, ізолююча: +180 − 90, остання — без переходу:
+    // 1420 + 180 + 90 = 1690 с ≈ 28.2 хв → 30
+    expect(estimateDayMinutes(day, 0, true)).toBe(30);
+    expect(dayStats(day, 0, true)).toEqual({ exercises: 3, sets: 10, minutes: 30 });
+  });
+
+  it("власне значення і мінімум з налаштувань", () => {
+    const custom = [day[0], { ...day[1], transitionRestSeconds: 600 }, day[2]];
+    // 1420 + 180 + (600 − 90) = 2110 с ≈ 35.2 хв → 35
+    expect(estimateDayMinutes(custom, 0, true)).toBe(35);
+    // мінімум 4:00 піднімає і звичайний відпочинок, і перехід після ізолюючої:
+    // 4 × 280 + 3 × 280 + 3 × 280 = 3080; переходи: 300 − 240 = 60, 240 − 240 = 0 → 3140 с ≈ 52.3 → 50
+    expect(estimateDayMinutes(day, 240, true)).toBe(50);
+  });
+
+  it("одна вправа — переходу немає", () => {
+    expect(estimateDayMinutes([day[0]], 0, true)).toBe(estimateDayMinutes([day[0]], 0, false));
+  });
+
+  it("patchExercise: власне значення в межах 0:00–15:00, null — авто", () => {
+    expect(patchExercise(ex(1), { transitionRestSeconds: 1200 }).transitionRestSeconds).toBe(900);
+    expect(patchExercise(ex(1), { transitionRestSeconds: -30 }).transitionRestSeconds).toBe(0);
+    expect(patchExercise(ex(1, { transitionRestSeconds: 240 }), { transitionRestSeconds: null }).transitionRestSeconds).toBeNull();
+  });
+
+  it("payload і «незбережені зміни» враховують нове поле", () => {
+    const saved = { name: "PPL", days: [{ key: "d", id: uuid(1), name: "Push", exercises: [ex(1)] }] };
+    const changed = { ...saved, days: [{ ...saved.days[0], exercises: [ex(1, { transitionRestSeconds: 240 })] }] };
+    expect(buildSavePayload(changed).days[0].exercises[0].transition_rest_seconds).toBe(240);
+    expect(buildSavePayload(saved).days[0].exercises[0].transition_rest_seconds).toBeNull();
+    expect(isDraftDirty(saved, changed)).toBe(true);
+    expect(saveProgramSchema.safeParse(buildSavePayload(changed)).success).toBe(true);
+    const tooLong = buildSavePayload(changed);
+    tooLong.days[0].exercises[0].transition_rest_seconds = 901;
+    expect(saveProgramSchema.safeParse(tooLong).error?.issues[0].message).toBe("transitionRestRange");
   });
 });

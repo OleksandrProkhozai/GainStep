@@ -317,3 +317,86 @@ describe("markPRs", () => {
     expect(markPRs([done(100, 10)], null)).toEqual([false]);
   });
 });
+
+describe("suggestNextWeight — тренажер / блок, крок 5 кг", () => {
+  const machine = (history: Session[], equipment = "machine") => suggest(history, { increment: 5, equipment });
+
+  it("increase: 40 × 12, 12, 12 → 45 (+5)", () => {
+    const s = machine([session(40, 12, 12, 12)]);
+    expect(s.action).toBe("increase");
+    expect(s.weight).toBe(45);
+    expect(s.delta).toBe(5);
+  });
+
+  it("same: 45 × 10, 9, 8 → 45", () => {
+    const s = machine([session(45, 10, 9, 8)]);
+    expect(s.action).toBe("same");
+    expect(s.weight).toBe(45);
+    expect(s.delta).toBe(0);
+  });
+
+  it("deload: 45 → 40 (−10% = 40.5, округлення до 5, не 42.5)", () => {
+    const s = machine([session(45, 6, 6, 5), session(45, 7, 6, 6)]);
+    expect(s.action).toBe("deload");
+    expect(s.weight).toBe(40);
+    expect(s.delta).toBe(-5);
+  });
+
+  it("deload мала вага: 20 → 15 (−10% = 18 округлилось би знову до 20)", () => {
+    const s = machine([session(20, 6, 6, 5), session(20, 7, 6, 6)]);
+    expect(s.weight).toBe(15);
+  });
+
+  it("deload велика вага: 80 → 70 (−10% = 72 → 70)", () => {
+    const s = machine([session(80, 6, 6, 5), session(80, 7, 6, 6)]);
+    expect(s.weight).toBe(70);
+  });
+
+  describe("вага в історії не кратна 5 (12.5 кг на блоці)", () => {
+    it("increase → 15, а не 17.5", () => {
+      const s = machine([session(12.5, 12, 12, 12)]);
+      expect(s.action).toBe("increase");
+      expect(s.weight).toBe(15);
+      expect(s.delta).toBe(2.5);
+    });
+
+    it("same → 10, а не 12.5", () => {
+      const s = machine([session(12.5, 10, 9, 8)]);
+      expect(s.action).toBe("same");
+      expect(s.weight).toBe(10);
+      expect(s.delta).toBe(-2.5);
+      expect(s.reason).toBe("Keep 10 kg until all sets reach 12 reps");
+    });
+
+    it("deload → 10, а не 7.5 чи 11.25", () => {
+      const s = machine([session(12.5, 6, 6, 5), session(12.5, 7, 6, 6)]);
+      expect(s.action).toBe("deload");
+      expect(s.weight).toBe(10);
+    });
+
+    it("42.5 → increase 45, deload 40 (−10% = 38.25 → 40)", () => {
+      expect(machine([session(42.5, 12, 12, 12)]).weight).toBe(45);
+      expect(machine([session(42.5, 6, 6, 5), session(42.5, 7, 6, 6)]).weight).toBe(40);
+    });
+  });
+
+  it("вага з lb (110 lb = 49.9 кг) вважається кратною: same лишає її, increase → 55", () => {
+    const w = 110 * 0.45359237;
+    expect(machine([session(w, 10, 9, 8)]).weight).toBe(w);
+    expect(machine([session(w, 12, 12, 12)]).weight).toBe(55);
+  });
+});
+
+describe("suggestNextWeight — вільна вага без прив'язки до сітки", () => {
+  it("гантелі 22.5 при кроці 2: same лишає 22.5, increase → 24.5", () => {
+    expect(suggest([session(22.5, 10, 9, 8)], { increment: 2, equipment: "dumbbell" }).weight).toBe(22.5);
+    expect(suggest([session(22.5, 12, 12, 12)], { increment: 2, equipment: "dumbbell" }).weight).toBe(24.5);
+  });
+
+  it("блок і тренажер прив'язуються однаково", () => {
+    const h = [session(12.5, 12, 12, 12)];
+    expect(suggest(h, { increment: 5, equipment: "cable" }).weight).toBe(15);
+    expect(suggest(h, { increment: 5, equipment: "machine" }).weight).toBe(15);
+    expect(suggest(h, { increment: 5, equipment: "barbell" }).weight).toBe(17.5);
+  });
+});

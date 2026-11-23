@@ -1,8 +1,10 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 import { useWeightFormat } from "@/components/i18n/use-format";
 import { useMinRest } from "@/components/preferences/preferences-provider";
+import { exerciseName } from "@/lib/i18n/names";
 import { cn } from "@/lib/utils";
 import { effectiveRest } from "@/lib/workout/rest";
 import { useWorkout } from "./context";
@@ -18,10 +20,30 @@ function useRest() {
   const active = running || rest.pausedRemaining !== null;
   return {
     active,
+    /** Перехід між вправами (довший таймер) чи відпочинок між підходами. */
+    transition: rest.kind === "transition",
+    nextExerciseId: rest.nextExerciseId ?? null,
     paused: !running && rest.pausedRemaining !== null,
     remaining,
     fraction: active && rest.duration > 0 ? remaining / rest.duration : 0,
   };
+}
+
+/** Крок кнопок ±: 30 с для переходу, 15 с між підходами. */
+const adjustStep = (transition: boolean) => (transition ? 30 : 15);
+
+/** Наступна вправа переходу: "Далі: Жим гантелей на похилій лаві" з мініатюрою. */
+function NextExercise({ exerciseId, compact }: { exerciseId: string | null; compact?: boolean }) {
+  const t = useTranslations("workout.rest");
+  const locale = useLocale();
+  const exercise = useWorkout((s) => s.exercises.find((e) => e.exerciseId === exerciseId) ?? null);
+  if (!exercise) return null;
+  return (
+    <span className={cn("flex min-w-0 items-center gap-2", !compact && "justify-center")}>
+      <ExerciseThumb exercise={exercise} size="sm" className={compact ? "size-6 rounded-md" : "size-8 rounded-lg"} />
+      <span className="truncate">{t("transitionNext", { name: exerciseName(exercise, locale) })}</span>
+    </span>
+  );
 }
 
 function useNextLabel() {
@@ -68,7 +90,7 @@ function RestRing({
   );
 }
 
-function RestButtons({ disabled, size }: { disabled: boolean; size: "sm" | "md" }) {
+function RestButtons({ disabled, size, step }: { disabled: boolean; size: "sm" | "md"; step: number }) {
   const t = useTranslations("workout.rest");
   const adjust = useWorkout((s) => s.adjustRest);
   const stop = useWorkout((s) => s.stopRest);
@@ -78,11 +100,11 @@ function RestButtons({ disabled, size }: { disabled: boolean; size: "sm" | "md" 
   );
   return (
     <>
-      <button type="button" className={cls} disabled={disabled} onClick={() => adjust(-15, Date.now())}>
-        −15s
+      <button type="button" className={cls} disabled={disabled} onClick={() => adjust(-step, Date.now())}>
+        {t("minus", { seconds: step })}
       </button>
-      <button type="button" className={cls} disabled={disabled} onClick={() => adjust(15, Date.now())}>
-        +15s
+      <button type="button" className={cls} disabled={disabled} onClick={() => adjust(step, Date.now())}>
+        {t("plus", { seconds: step })}
       </button>
       <button type="button" className={cls} disabled={disabled} onClick={stop}>
         {t("skip")}
@@ -93,7 +115,7 @@ function RestButtons({ disabled, size }: { disabled: boolean; size: "sm" | "md" 
 
 /** Десктоп: картка "Rest timer" з великим кільцем. Тап по кільцю — пауза. */
 export function RestCard() {
-  const { active, paused, remaining, fraction } = useRest();
+  const { active, paused, remaining, fraction, transition, nextExerciseId } = useRest();
   const toggle = useWorkout((s) => s.toggleRestPause);
   const t = useTranslations("workout.rest");
   const nextLabel = useNextLabel();
@@ -125,13 +147,15 @@ export function RestCard() {
             </span>
           </RestRing>
         </button>
-        <p className="mt-3 font-semibold">{paused ? t("paused") : t("restTime")}</p>
-        <p className="mt-0.5 text-center text-sm text-muted-foreground">
-          {active ? nextLabel : t("idle")}
+        <p className="mt-3 text-center font-semibold">
+          {paused ? t("paused") : active && transition ? t("transitionTitle") : t("restTime")}
         </p>
+        <div className="mt-1 max-w-full text-center text-sm text-muted-foreground">
+          {active && transition ? <NextExercise exerciseId={nextExerciseId} /> : active ? nextLabel : t("idle")}
+        </div>
       </div>
       <div className="mt-4 flex gap-2">
-        <RestButtons disabled={!active} size="md" />
+        <RestButtons disabled={!active} size="md" step={adjustStep(active && transition)} />
       </div>
     </section>
   );
@@ -140,7 +164,7 @@ export function RestCard() {
 /** Телефон: компактна панель над нижнім краєм, видима лише під час відпочинку. */
 export function RestBar() {
   const t = useTranslations("workout.rest");
-  const { active, paused, remaining, fraction } = useRest();
+  const { active, paused, remaining, fraction, transition, nextExerciseId } = useRest();
   const toggle = useWorkout((s) => s.toggleRestPause);
   const nextLabel = useNextLabel();
   if (!active) return null;
@@ -161,11 +185,15 @@ export function RestBar() {
           </RestRing>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{paused ? t("paused") : t("restTime")}</p>
-          <p className="truncate text-xs text-muted-foreground">{nextLabel}</p>
+          <p className="truncate text-sm font-semibold">
+            {paused ? t("paused") : transition ? t("transitionTitle") : t("restTime")}
+          </p>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {transition ? <NextExercise exerciseId={nextExerciseId} compact /> : <p className="truncate">{nextLabel}</p>}
+          </div>
         </div>
         <div className="flex shrink-0 gap-1.5">
-          <RestButtons disabled={false} size="sm" />
+          <RestButtons disabled={false} size="sm" step={adjustStep(transition)} />
         </div>
       </div>
     </div>

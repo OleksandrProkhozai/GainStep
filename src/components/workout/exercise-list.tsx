@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { exerciseName } from "@/lib/i18n/names";
 import { cn } from "@/lib/utils";
 import { useScreen, useWorkout } from "./context";
-import { ProgressDots } from "./parts";
+import { AddedBadge, ProgressDots } from "./parts";
 import { useExerciseProgress } from "./use-workout-view";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 
@@ -42,8 +42,9 @@ export function ExerciseList({ onPick }: { onPick?: () => void }) {
                 <ExerciseThumb exercise={exercise} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{exerciseName(exercise, locale)}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     {t("setsProgress", { done, total })}
+                    {exercise.source === "added" && <AddedBadge />}
                   </span>
                 </span>
                 {complete ? (

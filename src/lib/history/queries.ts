@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, toDayKey } from "@/lib/dates";
 import { getTemplateNames, templateName, type TemplateNames } from "@/lib/programs/template-names";
 import { loadExerciseSessions } from "@/lib/workout/queries";
-import { ADDED_EXERCISE_DEFAULTS } from "@/lib/workout/types";
+import { parsePlan, progressionParams } from "@/lib/workout/plan";
 import type { Database } from "@/types/database.types";
 import {
   analyzeExerciseSessions,
@@ -25,10 +25,10 @@ import { historyRange, inRange, monthBounds, queryBounds } from "./month";
 type Client = SupabaseClient<Database>;
 
 /** Тренування з днем програми та підходами з вправами — один запит (без N+1). */
-const WORKOUT_SELECT = `id, name, status, started_at, finished_at, notes, program_day_id,
+const WORKOUT_SELECT = `id, name, status, started_at, finished_at, notes, program_day_id, exercise_plan,
   program_day:program_days ( program_id, program_exercises ( exercise_id, target_sets, rep_min, rep_max ) ),
   workout_sets ( exercise_id, exercise_position, set_number, weight, reps, is_completed, completed_at,
-    exercise:exercises ( id, name, name_uk, muscle_group, image_path, owner_id, weight_increment ) )`;
+    exercise:exercises ( id, name, name_uk, muscle_group, image_path, owner_id, weight_increment, equipment ) )`;
 
 type WorkoutRow = {
   id: string;
@@ -38,6 +38,7 @@ type WorkoutRow = {
   finished_at: string | null;
   notes: string | null;
   program_day_id: string | null;
+  exercise_plan: unknown;
   program_day: {
     program_id: string;
     program_exercises: { exercise_id: string; target_sets: number; rep_min: number; rep_max: number }[];
@@ -58,6 +59,7 @@ type WorkoutRow = {
       image_path: string | null;
       owner_id: string | null;
       weight_increment: number;
+      equipment: string;
     } | null;
   }[];
 };
@@ -74,7 +76,8 @@ export type HistoryData = {
 function toRaw(row: WorkoutRow, names: TemplateNames, locale: string) {
   const params = new Map<string, ProgressionParams>();
   const byExercise = new Map<string, RawHistoryWorkout["exercises"][number]>();
-  const programParams = new Map((row.program_day?.program_exercises ?? []).map((pe) => [pe.exercise_id, pe]));
+  // Склад тренування (додані вправи) → день програми → значення доданої вправи.
+  const paramsOf = progressionParams(parsePlan(row.exercise_plan), row.program_day?.program_exercises ?? []);
 
   const sets = [...row.workout_sets].sort(
     (a, b) => a.exercise_position - b.exercise_position || a.set_number - b.set_number,
@@ -95,12 +98,10 @@ function toRaw(row: WorkoutRow, names: TemplateNames, locale: string) {
         sets: [],
       };
       byExercise.set(s.exercise_id, entry);
-      const pe = programParams.get(s.exercise_id);
       params.set(s.exercise_id, {
-        repMin: pe?.rep_min ?? ADDED_EXERCISE_DEFAULTS.repMin,
-        repMax: pe?.rep_max ?? ADDED_EXERCISE_DEFAULTS.repMax,
-        targetSets: pe?.target_sets ?? ADDED_EXERCISE_DEFAULTS.targetSets,
+        ...paramsOf(s.exercise_id),
         increment: Number(s.exercise.weight_increment),
+        equipment: s.exercise.equipment,
       });
     }
     entry.sets.push({

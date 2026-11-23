@@ -1,8 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import type { WorkoutStore } from "./store";
+import { planFromExercises, type PlanItem } from "./plan";
+import { PLAN_KEY, type WorkoutStore } from "./store";
 
 type Client = SupabaseClient<Database>;
+
+/** Збереження складу тренування (server action saveExercisePlan). Помилка — throw. */
+export type SavePlan = (workoutId: string, plan: PlanItem[]) => Promise<void>;
 
 /**
  * Синхронізація підходів з workout_sets.
@@ -12,10 +16,13 @@ type Client = SupabaseClient<Database>;
  * номерами (після видалення підходу) видаляються. Так база завжди
  * дорівнює локальному стану вправи, і повторна відправка безпечна.
  *
+ * Склад тренування (PLAN_KEY у черзі) — так само: повторна відправка
+ * безпечна, бо зберігається весь масив workouts.exercise_plan.
+ *
  * Невдалі вправи лишаються в черзі (store.pending) і відправляються знову
  * при наступній зміні, події 'online' або періодичній повторній спробі.
  */
-export function createSyncer(store: WorkoutStore, supabase: Client) {
+export function createSyncer(store: WorkoutStore, supabase: Client, savePlan: SavePlan) {
   let running: Promise<boolean> | null = null;
   let again = false;
 
@@ -69,7 +76,12 @@ export function createSyncer(store: WorkoutStore, supabase: Client) {
       store.getState().setSyncStatus("saving");
       try {
         for (const id of ids) {
-          await syncExercise(id);
+          if (id === PLAN_KEY) {
+            const { workoutId, exercises } = store.getState();
+            await savePlan(workoutId, planFromExercises(exercises));
+          } else {
+            await syncExercise(id);
+          }
           store.getState().ackSynced({ [id]: snapshot[id] });
         }
       } catch (error) {

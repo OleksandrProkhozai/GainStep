@@ -12,6 +12,7 @@ import type { NextUp, SummaryPageData } from "@/lib/workout/summary-queries";
 import type { SummaryExercise, SummarySet } from "@/lib/workout/summary";
 import { suggestionReason } from "@/lib/workout/suggestion-text";
 import { NotesCard } from "./notes-card";
+import { PlanChangesCard } from "./plan-changes-card";
 import { Card, CardTitle, Confetti, DoneBadge, pill, TrophyBurst } from "./parts";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 
@@ -83,6 +84,9 @@ export function SummaryView({ data }: { data: SummaryPageData }) {
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-4 xl:gap-5">
           <NextTimeCard exercises={summary.exercises} unit={unit} className="max-lg:order-3" />
+          {data.planChanges && (
+            <PlanChangesCard workoutId={data.workoutId} changes={data.planChanges} className="max-lg:order-5" />
+          )}
           {data.nextUp && <NextUpCard nextUp={data.nextUp} className="max-lg:order-5" />}
           <div className="hidden flex-col gap-3 lg:flex">
             <Link href="/" className={cn(pill, "h-12 w-full bg-primary text-base text-primary-foreground hover:bg-primary/90")}>

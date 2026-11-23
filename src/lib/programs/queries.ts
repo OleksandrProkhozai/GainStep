@@ -77,7 +77,7 @@ export async function getProgramsList(supabase: Client, userId: string, locale: 
   };
 }
 
-const LIBRARY_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path";
+const LIBRARY_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path, is_compound";
 
 type LibraryRow = {
   id: string;
@@ -88,6 +88,7 @@ type LibraryRow = {
   weight_increment: number;
   owner_id: string | null;
   image_path: string | null;
+  is_compound: boolean;
 };
 
 export function toLibraryExercise(row: LibraryRow): LibraryExercise {
@@ -98,6 +99,7 @@ export function toLibraryExercise(row: LibraryRow): LibraryExercise {
     muscleGroup: row.muscle_group,
     equipment: row.equipment,
     incrementKg: Number(row.weight_increment),
+    isCompound: row.is_compound,
     custom: row.owner_id !== null,
     imagePath: row.image_path,
   };
@@ -153,7 +155,7 @@ export async function getProgramEditor(
       .select(
         `id, name, name_uk, description, description_uk, days_per_week, level, owner_id, source_template_id, image_path, updated_at,
          program_days ( id, name, name_uk, position,
-           program_exercises ( id, position, exercise_id, target_sets, rep_min, rep_max, rest_seconds,
+           program_exercises ( id, position, exercise_id, target_sets, rep_min, rep_max, rest_seconds, transition_rest_seconds,
              exercise:exercises ( ${LIBRARY_COLUMNS} ) ) )`,
       )
       .eq("id", programId)
@@ -209,6 +211,8 @@ export async function getProgramEditor(
             repMin: pe.rep_min,
             repMax: pe.rep_max,
             restSeconds: pe.rest_seconds,
+            isCompound: pe.exercise!.is_compound,
+            transitionRestSeconds: pe.transition_rest_seconds,
           })),
       })),
     },

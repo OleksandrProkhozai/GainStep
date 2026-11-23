@@ -34,6 +34,8 @@ export interface ScreenApi {
   requestDiscard: () => void;
   openAddExercise: () => void;
   openNote: () => void;
+  /** Прибрати вправу з тренування (з підтвердженням, якщо є виконані підходи). */
+  requestRemoveExercise: (exerciseId: string) => void;
   openExercises: () => void;
   finishing: boolean;
 }

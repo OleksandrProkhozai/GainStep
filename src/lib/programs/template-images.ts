@@ -1,13 +1,13 @@
 /**
- * Картинки шаблонів програм (public/templates/*.webp, 384×384).
- * Прив'язка — за фіксованими id шаблонів із supabase/seed.sql.
- * Оригінали (2048px) лежать поза public/ — в assets/templates/.
+ * Картинки програм (public/programs/*.webp, 384×384) — спільні для шаблону
+ * і його копій. Прив'язка — за фіксованими id шаблонів із supabase/seed.sql.
+ * Оригінали (2048px) лежать поза public/ — в assets/programs/.
  */
 
 export const TEMPLATE_IMAGES: Readonly<Record<string, string>> = {
-  "10000000-0000-0000-0000-000000000001": "/templates/full-body.webp",
-  "10000000-0000-0000-0000-000000000002": "/templates/upper-lower.webp",
-  "10000000-0000-0000-0000-000000000003": "/templates/push-pull-legs.webp",
+  "10000000-0000-0000-0000-000000000001": "/programs/full-body-v2.webp",
+  "10000000-0000-0000-0000-000000000002": "/programs/upper-lower-v2.webp",
+  "10000000-0000-0000-0000-000000000003": "/programs/push-pull-legs.webp",
 };
 
 /**

@@ -40,6 +40,7 @@ export function ExerciseTags({ exercise, className }: { exercise: WorkoutExercis
     value === exercise.muscleGroup ? tm(value as MuscleGroup) : tq(value as Equipment);
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
+      {exercise.source === "added" && <AddedBadge className="px-3.5 py-1 text-sm" />}
       {[exercise.muscleGroup, exercise.equipment].map((tag) => (
         <span
           key={tag}
@@ -49,6 +50,21 @@ export function ExerciseTags({ exercise, className }: { exercise: WorkoutExercis
         </span>
       ))}
     </div>
+  );
+}
+
+/** Маленький бейдж "Додано" — вправа додана під час тренування. */
+export function AddedBadge({ className }: { className?: string }) {
+  const t = useTranslations("workout");
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-accent-text",
+        className,
+      )}
+    >
+      {t("addedBadge")}
+    </span>
   );
 }
 

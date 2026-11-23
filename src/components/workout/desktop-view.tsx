@@ -21,7 +21,7 @@ import {
   WorkoutClock,
 } from "./parts";
 import { RestCard } from "./rest-timer";
-import { WorkoutMenu } from "./workout-menu";
+import { ExerciseMenu, WorkoutMenu } from "./workout-menu";
 import { useCurrentExercise, useWorkoutStats } from "./use-workout-view";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
 
@@ -113,9 +113,12 @@ function ExercisePanel() {
         <h2 className="min-w-0 flex-1 font-heading text-3xl leading-tight font-extrabold tracking-tight xl:text-[40px]">
           {exerciseName(exercise, locale)}
         </h2>
-        <p className="shrink-0 pt-2 text-sm text-muted-foreground">
-          {t("exerciseOf", { n: current.index + 1, total: current.total })}
-        </p>
+        <div className="flex shrink-0 items-center gap-1">
+          <p className="text-sm text-muted-foreground">
+            {t("exerciseOf", { n: current.index + 1, total: current.total })}
+          </p>
+          <ExerciseMenu exerciseId={exercise.exerciseId} className="-mr-2" />
+        </div>
       </div>
       <ExerciseTags exercise={exercise} className="mt-3" />
       <SuggestionBanner exercise={exercise} suggestion={current.suggestion} className="mt-4" />

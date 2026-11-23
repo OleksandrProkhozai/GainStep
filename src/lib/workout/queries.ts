@@ -3,6 +3,7 @@ import { historyBest, type PersonalBest, type Session } from "@/lib/progression"
 import type { Database } from "@/types/database.types";
 import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { groupSessionRows } from "./history";
+import { parsePlan } from "./plan";
 import type { ExerciseSession } from "./records";
 import {
   ADDED_EXERCISE_DEFAULTS,
@@ -105,12 +106,14 @@ type ExerciseRow = {
   weight_increment: number;
   image_path: string | null;
   owner_id: string | null;
+  is_compound: boolean;
 };
 
 /** Рядок exercises + параметри дня → вправа тренування (поки без історії). */
 export function toWorkoutExercise(
   exercise: ExerciseRow,
-  params: Pick<WorkoutExercise, "targetSets" | "repMin" | "repMax" | "restSeconds">,
+  params: Pick<WorkoutExercise, "targetSets" | "repMin" | "repMax" | "restSeconds"> &
+    Partial<Pick<WorkoutExercise, "transitionRestSeconds" | "source">>,
   history?: ExerciseHistory,
 ): WorkoutExercise {
   return {
@@ -122,13 +125,15 @@ export function toWorkoutExercise(
     increment: Number(exercise.weight_increment),
     imagePath: exercise.image_path,
     custom: exercise.owner_id !== null,
+    isCompound: exercise.is_compound,
+    transitionRestSeconds: null,
     ...params,
     history: history?.history ?? [],
     best: history?.best ?? null,
   };
 }
 
-const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, image_path, owner_id";
+const EXERCISE_COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, image_path, owner_id, is_compound";
 
 export type LoadWorkoutResult =
   | { kind: "ok"; data: WorkoutInit }
@@ -152,11 +157,11 @@ export async function loadWorkout(
     supabase
       .from("workouts")
       .select(
-        `id, name, status, started_at, notes,
+        `id, name, status, started_at, notes, exercise_plan,
          program_day:program_days (
            name,
            program:programs ( name ),
-           program_exercises ( position, target_sets, rep_min, rep_max, rest_seconds,
+           program_exercises ( position, target_sets, rep_min, rep_max, rest_seconds, transition_rest_seconds,
              exercise:exercises ( ${EXERCISE_COLUMNS} ) )
          )`,
       )
@@ -182,33 +187,83 @@ export async function loadWorkout(
   if (workout.status === "completed") return { kind: "completed" };
   const programName = workout.program_day?.program?.name;
 
-  // Вправи дня (за position) + вправи, додані під час тренування (з workout_sets).
-  // Одна вправа — один раз: ключ workout_sets містить exercise_id.
-  const ordered: { exercise: ExerciseRow; params: Parameters<typeof toWorkoutExercise>[1] }[] = [];
-  const seen = new Set<string>();
+  // Склад тренування: workouts.exercise_plan (додані / прибрані вправи), а для
+  // старих тренувань без нього — вправи дня (за position). В обох випадках
+  // дописуємо вправи, що мають підходи, але відсутні в складі (склад ще не
+  // встиг синхронізуватися з іншого пристрою). Одна вправа — один раз.
+  const plan = parsePlan(workout.exercise_plan);
   const dayExercises = [...(workout.program_day?.program_exercises ?? [])].sort(
     (a, b) => a.position - b.position,
   );
-  for (const pe of dayExercises) {
-    if (!pe.exercise || seen.has(pe.exercise.id)) continue;
-    seen.add(pe.exercise.id);
-    ordered.push({
-      exercise: pe.exercise,
-      params: {
-        targetSets: pe.target_sets,
-        repMin: pe.rep_min,
-        repMax: pe.rep_max,
-        restSeconds: pe.rest_seconds,
-      },
-    });
+  const dayById = new Map(
+    dayExercises.filter((pe) => pe.exercise).map((pe) => [pe.exercise!.id, pe]),
+  );
+
+  type Planned = { exerciseId: string; params: Parameters<typeof toWorkoutExercise>[1] };
+  const planned: Planned[] = [];
+  const seen = new Set<string>();
+  const push = (item: Planned) => {
+    if (seen.has(item.exerciseId)) return;
+    seen.add(item.exerciseId);
+    planned.push(item);
+  };
+
+  if (plan) {
+    for (const p of plan) {
+      push({
+        exerciseId: p.exercise_id,
+        params: {
+          targetSets: p.target_sets,
+          repMin: p.rep_min,
+          repMax: p.rep_max,
+          restSeconds: p.rest_seconds,
+          transitionRestSeconds: dayById.get(p.exercise_id)?.transition_rest_seconds ?? null,
+          source: p.source,
+        },
+      });
+    }
+  } else {
+    for (const pe of dayExercises) {
+      if (!pe.exercise) continue;
+      push({
+        exerciseId: pe.exercise.id,
+        params: {
+          targetSets: pe.target_sets,
+          repMin: pe.rep_min,
+          repMax: pe.rep_max,
+          restSeconds: pe.rest_seconds,
+          transitionRestSeconds: pe.transition_rest_seconds,
+          source: "program",
+        },
+      });
+    }
   }
   for (const s of setsRes.data) {
-    if (!s.exercise || seen.has(s.exercise.id)) continue;
-    seen.add(s.exercise.id);
-    ordered.push({ exercise: s.exercise, params: { ...ADDED_EXERCISE_DEFAULTS } });
+    if (!s.exercise) continue;
+    push({ exerciseId: s.exercise.id, params: { ...ADDED_EXERCISE_DEFAULTS, source: "added" } });
   }
 
-  const history = await loadExerciseHistory(supabase, [...seen]);
+  // Рядки exercises: з дня й з підходів уже є, решту (додані вправи без
+  // підходів) — окремим запитом, паралельно з історією.
+  const rows = new Map<string, ExerciseRow>();
+  for (const pe of dayExercises) if (pe.exercise) rows.set(pe.exercise.id, pe.exercise);
+  for (const s of setsRes.data) if (s.exercise) rows.set(s.exercise.id, s.exercise);
+  const missing = [...seen].filter((id) => !rows.has(id));
+
+  const [history, missingRes] = await Promise.all([
+    loadExerciseHistory(supabase, [...seen]),
+    missing.length > 0
+      ? supabase.from("exercises").select(EXERCISE_COLUMNS).in("id", missing)
+      : Promise.resolve({ data: [] as ExerciseRow[], error: null }),
+  ]);
+  if (missingRes.error) throw missingRes.error;
+  for (const row of missingRes.data ?? []) rows.set(row.id, row);
+
+  // Вправа, яку видалили з бібліотеки, з складу випадає.
+  const ordered = planned.flatMap((p) => {
+    const exercise = rows.get(p.exerciseId);
+    return exercise ? [{ exercise, params: p.params }] : [];
+  });
 
   const savedSets: SavedSet[] = setsRes.data.map((s) => ({
     exerciseId: s.exercise_id,
@@ -231,6 +286,7 @@ export async function loadWorkout(
         toWorkoutExercise(o.exercise, o.params, history.get(o.exercise.id)),
       ),
       savedSets,
+      planStored: plan !== null,
     },
   };
 }

@@ -1,8 +1,9 @@
 import { Suspense } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Manrope } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { DisableZoom } from "@/components/disable-zoom";
 import { LocaleSync } from "@/components/i18n/locale-sync";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -31,6 +32,21 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
+ * Масштабування сторінки на телефонах вимкнене. iOS Safari userScalable
+ * ігнорує, тому додатково працюють <DisableZoom /> і touch-action / 16px
+ * у globals.css. viewport-fit=cover — щоб env(safe-area-inset-*) працював
+ * на iPhone.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#0E0F11",
+};
+
+/**
  * <html lang> залежить від cookie, а читання cookie в кореневому layout
  * зробило б увесь застосунок request-bound. Тому (за порадою Next для
  * Cache Components) lang ставить inline-скрипт до першого малювання;
@@ -49,6 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: LANG_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
+        <DisableZoom />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

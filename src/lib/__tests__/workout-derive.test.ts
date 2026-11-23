@@ -9,7 +9,9 @@ import {
   clampReps,
   clampWeightKg,
   initialSets,
+  nextExerciseWithPending,
   nextPendingSet,
+  planRest,
   prIds,
   removeSet,
   workoutStats,
@@ -177,5 +179,71 @@ describe("межі", () => {
     expect(clampWeightKg(600)).toBe(500);
     expect(clampReps(150)).toBe(100);
     expect(clampReps(7.6)).toBe(8);
+  });
+});
+
+describe("planRest — перехід лише коли всі підходи вправи виконані", () => {
+  const settings = { minRestSeconds: 0, transitionRestEnabled: true };
+  const bench = exercise({ exerciseId: "bench", isCompound: true, restSeconds: 120 });
+  const raise = exercise({ exerciseId: "raise", isCompound: false, restSeconds: 60 });
+  const curl = exercise({ exerciseId: "curl", isCompound: false, restSeconds: 60 });
+  const exercises = [bench, raise, curl];
+  const sets = (spec: Record<string, boolean[]>) =>
+    Object.entries(spec).flatMap(([exerciseId, done]) =>
+      done.map((isCompleted, i) => set({ exerciseId, setNumber: i + 1, isCompleted })),
+    );
+
+  it("не останній підхід → звичайний відпочинок між підходами", () => {
+    expect(planRest(bench, exercises, sets({ bench: [true, false, false], raise: [false], curl: [false] }), settings)).toEqual({
+      kind: "set",
+      seconds: 120,
+      nextExerciseId: null,
+    });
+  });
+
+  it("останній підхід базової вправи → 5:00 до наступної невиконаної", () => {
+    expect(planRest(bench, exercises, sets({ bench: [true, true, true], raise: [false], curl: [false] }), settings)).toEqual({
+      kind: "transition",
+      seconds: 300,
+      nextExerciseId: "raise",
+    });
+  });
+
+  it("підходи не по порядку: перехід лише коли виконані ВСІ", () => {
+    // повернулись до жиму: відмітили 1-й, але 3-й ще ні → звичайний
+    expect(planRest(bench, exercises, sets({ bench: [true, false, true], raise: [true], curl: [false] }), settings).kind).toBe("set");
+    // тепер усі → перехід; наступна — перша невиконана (raise виконана, тож curl)
+    expect(planRest(bench, exercises, sets({ bench: [true, true, true], raise: [true], curl: [false] }), settings)).toMatchObject({
+      kind: "transition",
+      nextExerciseId: "curl",
+    });
+  });
+
+  it("пропущена раніше вправа: наступна — з початку списку", () => {
+    expect(planRest(curl, exercises, sets({ bench: [false], raise: [true], curl: [true] }), settings)).toMatchObject({
+      kind: "transition",
+      seconds: 180,
+      nextExerciseId: "bench",
+    });
+  });
+
+  it("остання вправа тренування або вимкнено → звичайний відпочинок", () => {
+    const allDone = sets({ bench: [true], raise: [true], curl: [true] });
+    expect(planRest(curl, exercises, allDone, settings)).toEqual({ kind: "set", seconds: 60, nextExerciseId: null });
+    const pending = sets({ bench: [true], raise: [false], curl: [false] });
+    expect(planRest(bench, exercises, pending, { ...settings, transitionRestEnabled: false }).kind).toBe("set");
+  });
+
+  it("власне значення і мінімум з налаштувань", () => {
+    const custom = exercise({ exerciseId: "bench", isCompound: true, transitionRestSeconds: 240 });
+    const pending = sets({ bench: [true], raise: [false] });
+    expect(planRest(custom, [custom, raise], pending, settings).seconds).toBe(240);
+    expect(planRest(custom, [custom, raise], pending, { ...settings, minRestSeconds: 270 }).seconds).toBe(270);
+  });
+
+  it("nextExerciseWithPending", () => {
+    const s = sets({ bench: [true], raise: [false], curl: [false] });
+    expect(nextExerciseWithPending(exercises, s, "bench")?.exerciseId).toBe("raise");
+    expect(nextExerciseWithPending(exercises, sets({ bench: [true], raise: [true], curl: [true] }), "curl")).toBeNull();
   });
 });

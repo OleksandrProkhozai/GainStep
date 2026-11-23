@@ -33,6 +33,8 @@ export const getSession = cache(async function getSession() {
     goal: profile?.goal ?? null,
     /** Мінімальний відпочинок, с (0 — вимкнено). */
     minRestSeconds: profile?.min_rest_seconds ?? REST_LIMITS.fallback,
+    /** "Довший відпочинок між вправами" (за замовчуванням увімкнено). */
+    transitionRestEnabled: profile?.transition_rest_enabled ?? TRANSITION_REST_FALLBACK,
     /** null — колонки ще немає (міграцію i18n не застосовано). */
     locale: (isLocale(profile?.locale) ? profile.locale : null) as Locale | null,
   };
@@ -60,9 +62,28 @@ type ProfileRow = {
   goal: "strength" | "hypertrophy" | null;
   min_rest_seconds: number;
   locale: string | null;
+  transition_rest_enabled: boolean;
 };
 
+/** Значення без міграції transition_rest — як default у базі (увімкнено). */
+const TRANSITION_REST_FALLBACK = true;
+
 async function loadProfile(supabase: Supabase, userId: string): Promise<ProfileRow | null> {
+  const full = await supabase
+    .from("profiles")
+    .select("display_name, onboarded_at, unit, experience, goal, min_rest_seconds, locale, transition_rest_enabled")
+    .eq("id", userId)
+    .maybeSingle();
+  if (full.error?.code !== "42703") return full.data;
+  const withoutTransition = await loadLegacyProfile(supabase, userId);
+  return withoutTransition ? { ...withoutTransition, transition_rest_enabled: TRANSITION_REST_FALLBACK } : null;
+}
+
+/** Профіль без transition_rest_enabled (міграцію transition_rest ще не застосовано). */
+async function loadLegacyProfile(
+  supabase: Supabase,
+  userId: string,
+): Promise<Omit<ProfileRow, "transition_rest_enabled"> | null> {
   const res = await supabase
     .from("profiles")
     .select("display_name, onboarded_at, unit, experience, goal, min_rest_seconds, locale")

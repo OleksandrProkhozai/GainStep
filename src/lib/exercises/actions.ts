@@ -20,7 +20,7 @@ export type ExerciseResult = { ok: true; exercise: LibraryExercise } | { ok: fal
 export type DeleteExerciseResult = { ok: true } | { ok: false; error: string };
 
 const idSchema = z.guid();
-const COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path";
+const COLUMNS = "id, name, name_uk, muscle_group, equipment, weight_increment, owner_id, image_path, is_compound";
 const IMAGE_INVALID = "exerciseImageInvalid";
 
 async function requireUser() {

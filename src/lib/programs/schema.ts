@@ -1,4 +1,5 @@
 import { z } from "@/lib/validations/zod-codes";
+import { TRANSITION_REST } from "@/lib/workout/rest";
 
 /**
  * Обмеження програми. Числа — як у CHECK-обмеженнях бази
@@ -46,6 +47,8 @@ export const programExerciseSchema = z
     rep_min: int(L.repsMin, L.repsMax, "repsRange"),
     rep_max: int(L.repsMin, L.repsMax, "repsRange"),
     rest_seconds: int(L.restMin, L.restMax, "restRange"),
+    /** null — авто (5:00 після базової, 3:00 після ізолюючої). */
+    transition_rest_seconds: int(TRANSITION_REST.min, TRANSITION_REST.max, "transitionRestRange").nullable(),
   })
   .refine((e) => e.rep_min <= e.rep_max, {
     message: "repsOrder",

@@ -41,6 +41,7 @@ export const profilePatchSchema = z
     goal: z.enum(GOALS),
     unit: z.enum(UNITS),
     minRestSeconds: restSecondsSchema,
+    transitionRestEnabled: z.boolean(),
     locale: z.enum(LOCALES),
   })
   .partial()
@@ -56,6 +57,7 @@ export function toProfileColumns(patch: ProfilePatch) {
     goal?: Goal;
     unit?: Enums<"weight_unit">;
     min_rest_seconds?: number;
+    transition_rest_enabled?: boolean;
     locale?: Locale;
   } = {};
   if (patch.displayName !== undefined) columns.display_name = patch.displayName;
@@ -63,6 +65,7 @@ export function toProfileColumns(patch: ProfilePatch) {
   if (patch.goal !== undefined) columns.goal = patch.goal;
   if (patch.unit !== undefined) columns.unit = patch.unit;
   if (patch.minRestSeconds !== undefined) columns.min_rest_seconds = patch.minRestSeconds;
+  if (patch.transitionRestEnabled !== undefined) columns.transition_rest_enabled = patch.transitionRestEnabled;
   if (patch.locale !== undefined) columns.locale = patch.locale;
   return columns;
 }

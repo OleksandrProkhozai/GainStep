@@ -6,23 +6,30 @@ import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { exerciseName } from "@/lib/i18n/names";
 import { useStore } from "zustand";
-import { useMinRest, useUnit } from "@/components/preferences/preferences-provider";
+import { useMinRest, useTransitionRestEnabled, useUnit } from "@/components/preferences/preferences-provider";
 import { createClient } from "@/lib/supabase/client";
-import { discardWorkout, finishWorkout } from "@/lib/workout/actions";
-import { firstPending } from "@/lib/workout/derive";
-import { effectiveRest } from "@/lib/workout/rest";
+import { discardWorkout, finishWorkout, saveExercisePlan } from "@/lib/workout/actions";
+import { firstPending, planRest } from "@/lib/workout/derive";
 import { createWorkoutStore, purgeOtherWorkouts, type WorkoutStore } from "@/lib/workout/store";
-import { createSyncer } from "@/lib/workout/sync";
+import { createSyncer, type SavePlan } from "@/lib/workout/sync";
 import type { WorkoutInit } from "@/lib/workout/types";
 import { ScreenContext, WorkoutStoreContext, type ScreenApi } from "./context";
 import { DesktopView } from "./desktop-view";
-import { AddExerciseDialog, ConfirmDialog, NoteDialog } from "./dialogs";
+import { AddExerciseDialog, ConfirmDialog, NoteDialog, RemoveExerciseDialog } from "./dialogs";
 import { playRestOverSound, primeAudio, useIsDesktop, useWakeLock } from "./hooks";
 import { MobileView } from "./mobile-view";
 import { WorkoutSkeleton } from "./workout-skeleton";
 
 /** Сповіщення про кінець відпочинку показуємо, лише якщо він закінчився нещодавно. */
 const REST_ALERT_WINDOW_MS = 60_000;
+/** Скільки висить toast "Вправу прибрано" з кнопкою "Повернути". */
+const UNDO_MS = 5_000;
+
+/** Склад тренування → server action; помилка (і офлайн) — throw, черга повторить. */
+const savePlan: SavePlan = async (workoutId, plan) => {
+  const result = await saveExercisePlan(workoutId, plan);
+  if (!result.ok) throw new Error(result.error);
+};
 
 /**
  * Екран активного тренування (клієнтська частина).
@@ -56,16 +63,26 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   // Мінімальний відпочинок читається в момент старту таймера: якщо його
   // змінили в Settings під час тренування, наступний відпочинок — уже з новим.
   const minRest = useMinRest();
+  // "Довший відпочинок між вправами" — так само читається в момент старту таймера.
+  const transitionRestEnabled = useTransitionRestEnabled();
   const t = useTranslations("workout");
   const locale = useLocale();
   const errorText = useErrorText();
   const isDesktop = useIsDesktop();
-  const [syncer] = useState(() => createSyncer(store, createClient()));
+  const [syncer] = useState(() => createSyncer(store, createClient(), savePlan));
   const [dialog, setDialog] = useState<null | "finish" | "discard" | "add" | "note">(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  /** Вправа, прибирання якої треба підтвердити (є виконані підходи). */
+  const [removing, setRemoving] = useState<string | null>(null);
   const [finishing, startFinishing] = useTransition();
 
   useWakeLock();
+
+  // Тренування без збереженого складу (почате до появи exercise_plan) —
+  // дозаписуємо склад, щоб він пережив інший пристрій.
+  useEffect(() => {
+    if (!init.planStored) store.getState().markPlanDirty();
+  }, [store, init.planStored]);
 
   // ── Синхронізація: кожна зміна черги → відкладена відправка;
   //    'online' і періодична повторна спроба — для офлайну.
@@ -121,7 +138,14 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
       }
       const exercise = store.getState().complete(clientId, Date.now());
       if (!exercise) return;
-      store.getState().startRest(effectiveRest(exercise.restSeconds, minRest), Date.now());
+      // Останній підхід вправи (усі виконані, у будь-якому порядку) → перехідний
+      // відпочинок до наступної невиконаної вправи; інакше — звичайний між підходами.
+      const state = store.getState();
+      const plan = planRest(exercise, state.exercises, state.sets, {
+        minRestSeconds: minRest,
+        transitionRestEnabled,
+      });
+      state.startRest(plan.seconds, Date.now(), plan.kind, plan.nextExerciseId);
       if (!firstPending(store.getState().sets, exercise.exerciseId)) {
         const { exercises, currentIndex } = store.getState();
         const next = exercises[currentIndex + 1];
@@ -132,7 +156,7 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
         }
       }
     },
-    [store, t, locale, minRest],
+    [store, t, locale, minRest, transitionRestEnabled],
   );
 
   const finish = useCallback(() => {
@@ -167,6 +191,43 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
     });
   }, [store, syncer, init.workoutId, errorText]);
 
+  // ── Прибирання вправи: з виконаними підходами — через підтвердження,
+  //    без них — одразу, з "Повернути" в toast.
+  const removeExercise = useCallback(
+    (exerciseId: string, undoable: boolean) => {
+      const removed = store.getState().removeExercise(exerciseId);
+      if (!removed) {
+        toast.error(t("toast.lastExercise"));
+        return;
+      }
+      const name = exerciseName(removed.exercise, locale);
+      if (!undoable) {
+        toast.success(t("toast.exerciseRemoved"), { description: name });
+        return;
+      }
+      toast.success(t("toast.exerciseRemoved"), {
+        description: name,
+        duration: UNDO_MS,
+        action: { label: t("toast.undo"), onClick: () => store.getState().restoreExercise(removed) },
+      });
+    },
+    [store, t, locale],
+  );
+
+  const requestRemoveExercise = useCallback(
+    (exerciseId: string) => {
+      const { exercises, sets } = store.getState();
+      if (exercises.length <= 1) {
+        toast.error(t("toast.lastExercise"));
+        return;
+      }
+      const done = sets.filter((s) => s.exerciseId === exerciseId && s.isCompleted).length;
+      if (done > 0) setRemoving(exerciseId);
+      else removeExercise(exerciseId, true);
+    },
+    [store, t, removeExercise],
+  );
+
   const requestFinish = useCallback(() => {
     const open = store.getState().sets.filter((s) => !s.isCompleted).length;
     if (open > 0) setDialog("finish");
@@ -188,10 +249,11 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
         setDialog("add");
       },
       openNote: () => setDialog("note"),
+      requestRemoveExercise,
       openExercises: () => setSheetOpen(true),
       finishing,
     }),
-    [init, unit, completeSet, requestFinish, finishing],
+    [init, unit, completeSet, requestFinish, requestRemoveExercise, finishing],
   );
 
   // ── Гарячі клавіші (не в полях вводу й не у відкритих діалогах)
@@ -239,6 +301,11 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
   }, [store, completeSet]);
 
   const openSets = useStore(store, (s) => s.sets.filter((x) => !x.isCompleted).length);
+  const removingExercise = useStore(store, (s) => s.exercises.find((e) => e.exerciseId === removing) ?? null);
+  const removingDone = useStore(
+    store,
+    (s) => s.sets.filter((x) => x.exerciseId === removing && x.isCompleted).length,
+  );
 
   return (
     <ScreenContext.Provider value={api}>
@@ -264,6 +331,15 @@ function Screen({ store, init }: { store: WorkoutStore; init: WorkoutInit }) {
         onConfirm={discard}
       />
       <AddExerciseDialog open={dialog === "add"} onOpenChange={(o) => setDialog(o ? "add" : null)} />
+      <RemoveExerciseDialog
+        exercise={removingExercise}
+        doneSets={removingDone}
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => {
+          if (removing) removeExercise(removing, false);
+          setRemoving(null);
+        }}
+      />
       <NoteDialog open={dialog === "note"} onOpenChange={(o) => setDialog(o ? "note" : null)} />
     </ScreenContext.Provider>
   );

@@ -68,7 +68,7 @@ export async function getDashboardData(
            id, name,
            program_days ( id, name, position,
              program_exercises ( position, exercise_id, target_sets, rep_min, rep_max,
-               exercises ( name, name_uk, weight_increment, muscle_group ) )
+               exercises ( name, name_uk, weight_increment, muscle_group, equipment ) )
            )
          )`,
       )
@@ -166,6 +166,7 @@ export async function getDashboardData(
         repMax: pe.rep_max,
         targetSets: pe.target_sets,
         increment: Number(pe.exercises?.weight_increment ?? 2.5),
+        equipment: pe.exercises?.equipment,
       })),
       weekData.sessions,
     ),
@@ -221,6 +222,8 @@ export function buildSmartProgression(
     repMax: number;
     targetSets: number;
     increment: number;
+    /** Обладнання вправи — тренажер / блок прив'язується до сітки кроку. */
+    equipment?: string;
   }[],
   sessions: Map<string, ExerciseSession[]>,
 ): SmartSuggestion[] {
@@ -235,6 +238,7 @@ export function buildSmartProgression(
       repMax: ex.repMax,
       targetSets: ex.targetSets,
       increment: ex.increment,
+      equipment: ex.equipment,
     });
     if (suggestion.action === "none") continue;
     result.push({

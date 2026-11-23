@@ -18,11 +18,15 @@ describe("мініатюра програми", () => {
     ).toBe(`${URL}/storage/v1/object/public/program-images/${USER}/${FILE}.webp`);
   });
 
-  it("шаблон і копія шаблону без фото — картинка шаблону", () => {
-    expect(programThumbSrc({ id: TEMPLATE_IDS.upperLower }, URL)).toBe("/templates/upper-lower.webp");
+  it("шаблон — картинка шаблону", () => {
+    expect(programThumbSrc({ id: TEMPLATE_IDS.upperLower }, URL)).toBe("/programs/upper-lower-v2.webp");
+  });
+
+  it("копія шаблону без фото — та сама картинка, що в шаблону", () => {
     expect(programThumbSrc({ id: MINE, sourceTemplateId: TEMPLATE_IDS.pushPullLegs, custom: true }, URL)).toBe(
-      "/templates/push-pull-legs.webp",
+      "/programs/push-pull-legs.webp",
     );
+    expect(programThumbSrc({ id: MINE, sourceTemplateId: "unknown", custom: true }, URL)).toBe(CUSTOM_PROGRAM_IMAGE);
   });
 
   it("власна програма без фото — картинка за замовчуванням", () => {

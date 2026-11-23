@@ -18,7 +18,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { ExercisePicker } from "@/components/exercises/exercise-picker";
-import { useMinRest } from "@/components/preferences/preferences-provider";
+import { useMinRest, useTransitionRestEnabled } from "@/components/preferences/preferences-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -74,6 +74,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
   const errorText = useErrorText();
   // Мінімальний відпочинок з Settings: лише при показі (чипи, ~хв) і для нових вправ.
   const minRest = useMinRest();
+  const transitionRest = useTransitionRestEnabled();
   const readOnly = program.isTemplate;
   const schedule = useScheduleText();
 
@@ -127,6 +128,8 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
       incrementKg: ex.incrementKg,
       imagePath: ex.imagePath ?? null,
       custom: ex.custom,
+      isCompound: ex.isCompound,
+      transitionRestSeconds: null,
       ...NEW_EXERCISE_DEFAULTS,
       restSeconds: effectiveRest(NEW_EXERCISE_DEFAULTS.restSeconds, minRest),
     }));
@@ -314,7 +317,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
       {/* День */}
       <section id="day-panel" role="tabpanel" aria-label={day.name} className="mt-4">
         <div className="flex min-h-10 items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground/85">{t("daySummary", dayStats(day.exercises, minRest))}</p>
+          <p className="text-sm font-semibold text-foreground/85">{t("daySummary", dayStats(day.exercises, minRest, transitionRest))}</p>
           {!readOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -515,6 +518,7 @@ function TemplateOverview({
   const t = useTranslations("programs.template");
   const te = useTranslations("programs.editor");
   const minRest = useMinRest();
+  const transitionRest = useTransitionRestEnabled();
   return (
     <section aria-labelledby="template-about" className="mt-5 rounded-2xl border border-foreground/10 bg-card p-4">
       <h2 id="template-about" className="font-heading text-base font-bold">
@@ -526,7 +530,7 @@ function TemplateOverview({
         {days.map((d) => (
           <li key={d.key} className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
             <span className="font-semibold">{d.name || te("untitled")}</span>
-            <span className="text-muted-foreground">{te("daySummary", dayStats(d.exercises, minRest))}</span>
+            <span className="text-muted-foreground">{te("daySummary", dayStats(d.exercises, minRest, transitionRest))}</span>
           </li>
         ))}
       </ul>

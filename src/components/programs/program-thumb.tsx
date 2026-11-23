@@ -13,8 +13,8 @@ const SIZE_CLASS: Record<ProgramThumbSize, string> = { sm: "size-11", md: "size-
  * (для шаблону — за id, для копії — за source_template_id) → для власної
  * програми картинка за замовчуванням → плитка з ініціалами (FB / UL / PPL).
  * Розміри: sm 44, md 56, lg 72; className може перевизначити розмір
- * (напр. max-sm:size-12). Фігури на картинках на весь зріст, тому
- * object-position — center 30% (у квадраті видно торс).
+ * (напр. max-sm:size-12). object-position center 30% — для неквадратних
+ * фото користувача (у квадраті видно торс).
  */
 export function ProgramThumb({
   program,

@@ -61,6 +61,7 @@ export function nextChip(
     repMax: row.repMax,
     targetSets: row.targetSets,
     increment: row.incrementKg,
+    equipment: row.equipment,
   });
   if (s.action === "none" || s.weight === null) {
     return { action: "none", weightKg: null, repMax: row.repMax };

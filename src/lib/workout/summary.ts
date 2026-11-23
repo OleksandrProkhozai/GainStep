@@ -33,6 +33,8 @@ export interface SummaryExerciseInput {
   targetSets: number;
   /** Крок ваги, кг. */
   increment: number;
+  /** Обладнання вправи — тренажер / блок прив'язується до сітки кроку. */
+  equipment?: string;
   /**
    * Завершені тренування з цією вправою, що були ДО поточного
    * (від найновішого). Алгоритму прогресії досить двох останніх.
@@ -168,6 +170,7 @@ export function buildWorkoutSummary(input: SummaryInput): WorkoutSummary {
       repMax: ex.repMax,
       targetSets: ex.targetSets,
       increment: ex.increment,
+      equipment: ex.equipment,
     });
 
     exercises.push({

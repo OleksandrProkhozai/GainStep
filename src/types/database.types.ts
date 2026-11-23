@@ -90,6 +90,7 @@ export type Database = {
           locale: string
           min_rest_seconds: number
           onboarded_at: string | null
+          transition_rest_enabled: boolean
           unit: Database["public"]["Enums"]["weight_unit"]
           updated_at: string
         }
@@ -103,6 +104,7 @@ export type Database = {
           locale?: string
           min_rest_seconds?: number
           onboarded_at?: string | null
+          transition_rest_enabled?: boolean
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
         }
@@ -116,6 +118,7 @@ export type Database = {
           locale?: string
           min_rest_seconds?: number
           onboarded_at?: string | null
+          transition_rest_enabled?: boolean
           unit?: Database["public"]["Enums"]["weight_unit"]
           updated_at?: string
         }
@@ -171,6 +174,7 @@ export type Database = {
           rep_min: number
           rest_seconds: number
           target_sets: number
+          transition_rest_seconds: number | null
         }
         Insert: {
           exercise_id: string
@@ -181,6 +185,7 @@ export type Database = {
           rep_min?: number
           rest_seconds?: number
           target_sets?: number
+          transition_rest_seconds?: number | null
         }
         Update: {
           exercise_id?: string
@@ -191,6 +196,7 @@ export type Database = {
           rep_min?: number
           rest_seconds?: number
           target_sets?: number
+          transition_rest_seconds?: number | null
         }
         Relationships: [
           {
@@ -316,6 +322,7 @@ export type Database = {
       workouts: {
         Row: {
           created_at: string
+          exercise_plan: Json | null
           finished_at: string | null
           id: string
           name: string
@@ -327,6 +334,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          exercise_plan?: Json | null
           finished_at?: string | null
           id?: string
           name: string
@@ -338,6 +346,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          exercise_plan?: Json | null
           finished_at?: string | null
           id?: string
           name?: string

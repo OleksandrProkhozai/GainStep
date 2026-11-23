@@ -1,6 +1,8 @@
 import { matchesExerciseQuery } from "@/lib/i18n/names";
 import { IMAGE_PATH_RE } from "./images";
 import { z } from "@/lib/validations/zod-codes";
+import { fromDisplayWeight } from "@/lib/units";
+import { isStackEquipment } from "@/lib/progression";
 import type { Enums } from "@/types/database.types";
 
 export type MuscleGroup = Enums<"muscle_group">;
@@ -47,6 +49,8 @@ export interface LibraryExercise {
   muscleGroup: MuscleGroup;
   equipment: Equipment;
   incrementKg: number;
+  /** Базова (багатосуглобова) вправа — exercises.is_compound. */
+  isCompound: boolean;
   /** Власна вправа користувача (owner_id = user). */
   custom: boolean;
   /** Фото вправи: шлях у bucket exercise-images; null — картинка за замовчуванням. */
@@ -90,6 +94,21 @@ export function parseFilter(params: { get(name: string): string | null }): Exerc
 
 export const EXERCISE_LIMITS = { nameMin: 2, nameMax: 80, stepMaxKg: 50 } as const;
 
+/** Крок ваги нової вправи за обладнанням, кг. */
+export const DEFAULT_STEP_KG: Readonly<Record<Equipment, number>> = {
+  barbell: 2.5,
+  dumbbell: 2,
+  machine: 5,
+  cable: 5,
+  bodyweight: 2.5,
+  kettlebell: 4,
+};
+
+/** Найменший крок за обладнанням, кг: у стеку тренажера / блока менше 5 кг не буває. */
+export function minStepKg(equipment: Equipment): number {
+  return isStackEquipment(equipment) ? 5 : 0;
+}
+
 /** Форма створення / редагування власної вправи. Крок — в одиницях користувача. */
 export const exerciseFormSchema = z.object({
   name: z
@@ -103,6 +122,9 @@ export const exerciseFormSchema = z.object({
   unit: z.enum(["kg", "lb"]),
   /** Шлях фото в bucket ("<user id>/<uuid>.webp"); null — картинка за замовчуванням. */
   imagePath: z.string().regex(IMAGE_PATH_RE, "exerciseImageInvalid").nullable().default(null),
+}).refine((v) => fromDisplayWeight(v.weightStep, v.unit) >= minStepKg(v.equipment) - 1e-9, {
+  message: "weightStepMachineMin",
+  path: ["weightStep"],
 });
 
 export type ExerciseFormInput = z.input<typeof exerciseFormSchema>;

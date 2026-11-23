@@ -133,6 +133,7 @@
     "weightStepRequired": "Enter a weight step",
     "weightStepPositive": "Weight step must be greater than 0",
     "weightStepUnrealistic": "Enter a realistic weight step",
+    "weightStepMachineMin": "For machines and cables the weight step is at least 5 kg (11 lb)",
     "exerciseExists": "You already have an exercise with this name",
     "exerciseSaveFailed": "Couldn’t save the exercise. Please try again.",
     "exerciseNotFound": "Exercise not found",
@@ -185,7 +186,10 @@
     "workoutEditNotSetUp": "Editing isn’t set up yet — run the save_workout_sets migration.",
     "workoutSaveFailed": "Couldn’t save the workout. Please try again.",
     "workoutDeleteFailed": "Couldn’t delete the workout. Please try again.",
-    "exportFailed": "Couldn’t prepare the file. Please try again."
+    "exportFailed": "Couldn’t prepare the file. Please try again.",
+    "transitionRestRange": "Rest after exercise must be from 0:00 to 15:00",
+    "workoutPlanInvalid": "Invalid workout exercise list",
+    "workoutPlanSaveFailed": "Couldn’t save the workout exercise list"
   },
   "auth": {
     "meta": {
@@ -408,7 +412,11 @@
       "resume": "Resume rest timer",
       "skip": "Skip",
       "allDone": "All sets done",
-      "next": "Next: Set {n} · {weight} × {reps}"
+      "next": "Next: Set {n} · {weight} × {reps}",
+      "transitionTitle": "Moving to the next exercise",
+      "transitionNext": "Next: {name}",
+      "minus": "−{seconds}s",
+      "plus": "+{seconds}s"
     },
     "toast": {
       "restOver": "Rest is over",
@@ -417,7 +425,10 @@
       "exerciseDone": "{name} done",
       "nextUp": "Next up: {name}",
       "notSynced": "Some sets aren’t synced yet",
-      "notSyncedText": "Check your connection and try again."
+      "notSyncedText": "Check your connection and try again.",
+      "exerciseRemoved": "Exercise removed",
+      "undo": "Undo",
+      "lastExercise": "You can’t remove the last exercise of the workout"
     },
     "finishDialog": {
       "title": "Finish workout?",
@@ -435,7 +446,22 @@
       "loading": "Loading",
       "empty": "No exercises found",
       "loadFailed": "Couldn’t load exercises",
-      "addFailed": "Couldn’t add the exercise. Check your connection."
+      "addFailed": "Couldn’t add the exercise. Check your connection.",
+      "alreadyIn": "In workout",
+      "afterCurrent": "Add after current",
+      "afterCurrentHint": "New exercises go right after the current one",
+      "atEndHint": "New exercises go to the end of the workout",
+      "addedOne": "Added: {name}",
+      "addedMany": "{count, plural, one {Added # exercise} other {Added # exercises}}"
+    },
+    "addedBadge": "Added",
+    "exerciseOptions": "Exercise options",
+    "removeExercise": "Remove from workout",
+    "removeLastHint": "The last exercise of the workout",
+    "removeDialog": {
+      "title": "Remove “{name}”?",
+      "text": "{count, plural, one {# completed set will be deleted.} other {# completed sets will be deleted.}}",
+      "confirm": "Remove"
     }
   },
   "summary": {
@@ -482,6 +508,14 @@
       "placeholder": "How did it feel?",
       "add": "Add a note",
       "saved": "Note saved"
+    },
+    "planChanges": {
+      "title": "You changed this workout",
+      "text": "Your program stays the same. You can apply these changes to the program day.",
+      "apply": "Update “{day}” in the program",
+      "updated": "“{day}” updated",
+      "addedSr": "Added:",
+      "removedSr": "Removed:"
     }
   },
   "workouts": {
@@ -666,7 +700,11 @@
       "remove": "Remove",
       "decrease": "Decrease {label}",
       "increase": "Increase {label}",
-      "minRestTooltip": "Minimum rest from settings"
+      "minRestTooltip": "Minimum rest from settings",
+      "transitionRest": "Rest after exercise",
+      "transitionAuto": "Auto · {time}",
+      "transitionReset": "Reset to auto",
+      "transitionHint": "Timer after the last set, before the next exercise"
     },
     "list": {
       "active": "Active",
@@ -765,7 +803,8 @@
       "noMatch": "No exercises match your search.",
       "createCustom": "Create custom exercise",
       "addNone": "Add exercises",
-      "addCount": "{count, plural, one {Add # exercise} other {Add # exercises}}"
+      "addCount": "{count, plural, one {Add # exercise} other {Add # exercises}}",
+      "loading": "Loading exercises"
     },
     "form": {
       "createTitle": "Create exercise",
@@ -802,7 +841,9 @@
       "rest": "Minimum rest",
       "restHint": "No exercise will rest less than this. 0:00 turns it off.",
       "restDecrease": "Decrease rest by 15 seconds",
-      "restIncrease": "Increase rest by 15 seconds"
+      "restIncrease": "Increase rest by 15 seconds",
+      "transitionRest": "Longer rest between exercises",
+      "transitionRestHint": "5 min after compound, 3 min after isolation"
     },
     "account": {
       "title": "Account",

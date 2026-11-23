@@ -6,10 +6,33 @@ import {
   buildSets,
   clampReps,
   clampWeightKg,
+  firstPending,
   initialSets,
   removeSet,
+  type RestKind,
 } from "./derive";
+import {
+  indexAfterRemoval,
+  indexAfterRestore,
+  insertExercises,
+  removeExercise as removeFromList,
+  restoreExercise as restoreToList,
+  type AddPlacement,
+} from "./plan";
 import type { WorkoutExercise, WorkoutInit, WorkoutSet } from "./types";
+
+/**
+ * Ключ складу тренування (workouts.exercise_plan) у черзі синхронізації.
+ * Інші ключі — uuid вправ, тож збігу не буває.
+ */
+export const PLAN_KEY = "__plan__";
+
+/** Прибрана вправа — для "Повернути" в toast. */
+export interface RemovedExercise {
+  exercise: WorkoutExercise;
+  sets: WorkoutSet[];
+  index: number;
+}
 
 /**
  * Стан таймера відпочинку. Рахуємо від абсолютного часу endsAt, тож
@@ -23,6 +46,10 @@ export interface RestTimer {
   /** Повна тривалість, мс (для кільця прогресу). */
   duration: number;
   pausedRemaining: number | null;
+  /** "set" — між підходами, "transition" — між вправами. Старі стани без поля — "set". */
+  kind?: RestKind;
+  /** Наступна вправа для підпису "Далі: …" (лише transition). */
+  nextExerciseId?: string | null;
 }
 
 export type SyncStatus = "saved" | "saving" | "offline";
@@ -56,8 +83,15 @@ export interface WorkoutActions {
   uncomplete: (clientId: string) => void;
   addSet: (exerciseId: string) => void;
   deleteSet: (clientId: string) => void;
-  addExercise: (exercise: WorkoutExercise) => void;
-  startRest: (seconds: number, now: number) => void;
+  /** Додає вправи (уже наявні пропускає); повертає додані. */
+  addExercises: (exercises: WorkoutExercise[], placement: AddPlacement) => WorkoutExercise[];
+  /** Прибирає вправу з тренування; null — остання вправа або її немає. */
+  removeExercise: (exerciseId: string) => RemovedExercise | null;
+  /** Undo прибирання: вправа з підходами повертається на своє місце. */
+  restoreExercise: (removed: RemovedExercise) => void;
+  /** Поставити склад тренування в чергу синхронізації. */
+  markPlanDirty: () => void;
+  startRest: (seconds: number, now: number, kind?: RestKind, nextExerciseId?: string | null) => void;
   toggleRestPause: (now: number) => void;
   adjustRest: (seconds: number, now: number) => void;
   stopRest: () => void;
@@ -69,7 +103,7 @@ export interface WorkoutActions {
 
 export type WorkoutStore = ReturnType<typeof createWorkoutStore>;
 
-const IDLE_REST: RestTimer = { endsAt: null, duration: 0, pausedRemaining: null };
+const IDLE_REST: RestTimer = { endsAt: null, duration: 0, pausedRemaining: null, kind: "set", nextExerciseId: null };
 
 export const STORAGE_PREFIX = "gainstep-workout-";
 
@@ -106,6 +140,18 @@ export function createWorkoutStore(init: WorkoutInit) {
             : pending;
 
         const findSet = (clientId: string) => get().sets.find((s) => s.clientId === clientId);
+
+        /**
+         * Зміна складу: у черзі — сам склад і всі вправи з рядками в базі
+         * (у них змінився exercise_position — порядок на підсумку й в історії).
+         */
+        const bumpPlan = (pending: Record<string, number>, sets: WorkoutSet[]) => {
+          const next: Record<string, number> = { ...pending, [PLAN_KEY]: (pending[PLAN_KEY] ?? 0) + 1 };
+          for (const id of new Set(sets.filter((s) => s.tracked).map((s) => s.exerciseId))) {
+            next[id] = (next[id] ?? 0) + 1;
+          }
+          return next;
+        };
 
         return {
           workoutId: init.workoutId,
@@ -186,19 +232,77 @@ export function createWorkoutStore(init: WorkoutInit) {
             }));
           },
 
-          addExercise: (exercise) => {
-            if (get().exercises.some((e) => e.exerciseId === exercise.exerciseId)) return;
-            set((s) => ({
-              exercises: [...s.exercises, exercise],
-              sets: [...s.sets, ...initialSets(exercise)],
-              currentIndex: s.exercises.length,
-              expandedSetId: null,
-            }));
+          addExercises: (items, placement) => {
+            const s = get();
+            const result = insertExercises(s.exercises, items, s.currentIndex, placement);
+            if (result.added.length === 0) return [];
+            const sets = [...s.sets, ...result.added.flatMap((e) => initialSets(e))];
+            set({
+              exercises: result.list,
+              sets,
+              currentIndex: result.currentIndex,
+              pending: bumpPlan(s.pending, sets),
+            });
+            return result.added;
           },
 
-          startRest: (seconds, now) => {
+          removeExercise: (exerciseId) => {
+            const s = get();
+            const result = removeFromList(s.exercises, exerciseId);
+            if (!result) return null;
+            const own = s.sets.filter((x) => x.exerciseId === exerciseId);
+            const sets = s.sets.filter((x) => x.exerciseId !== exerciseId);
+            // Рядки прибраної вправи видаляє синхронізація (bump — за станом ДО видалення).
+            const pending = bump(bumpPlan(s.pending, sets), exerciseId, s.sets);
+            // Таймер відпочинку не чіпаємо; лише "Далі: …" переводимо на іншу вправу.
+            let rest = s.rest;
+            if (rest.nextExerciseId === exerciseId) {
+              const order = [
+                ...result.list.slice(result.removedIndex),
+                ...result.list.slice(0, result.removedIndex),
+              ];
+              const next = order.find((e) => firstPending(sets, e.exerciseId) !== null);
+              rest = { ...rest, nextExerciseId: next?.exerciseId ?? null };
+            }
+            set({
+              exercises: result.list,
+              sets,
+              currentIndex: indexAfterRemoval(s.currentIndex, result.removedIndex, result.list.length),
+              expandedSetId: own.some((x) => x.clientId === s.expandedSetId) ? null : s.expandedSetId,
+              rest,
+              pending,
+            });
+            return { exercise: result.removed, sets: own, index: result.removedIndex };
+          },
+
+          restoreExercise: ({ exercise, sets: own, index }) => {
+            const s = get();
+            if (s.exercises.some((e) => e.exerciseId === exercise.exerciseId)) return;
+            const exercises = restoreToList(s.exercises, exercise, index);
+            const restoredIndex = exercises.findIndex((e) => e.exerciseId === exercise.exerciseId);
+            const sets = [...s.sets, ...own];
+            set({
+              exercises,
+              sets,
+              currentIndex: indexAfterRestore(s.currentIndex, restoredIndex),
+              pending: bump(bumpPlan(s.pending, sets), exercise.exerciseId, sets),
+            });
+          },
+
+          markPlanDirty: () =>
+            set((s) => ({ pending: { ...s.pending, [PLAN_KEY]: (s.pending[PLAN_KEY] ?? 0) + 1 } })),
+
+          startRest: (seconds, now, kind = "set", nextExerciseId = null) => {
             if (seconds <= 0) return set({ rest: IDLE_REST });
-            set({ rest: { endsAt: now + seconds * 1000, duration: seconds * 1000, pausedRemaining: null } });
+            set({
+              rest: {
+                endsAt: now + seconds * 1000,
+                duration: seconds * 1000,
+                pausedRemaining: null,
+                kind,
+                nextExerciseId: kind === "transition" ? nextExerciseId : null,
+              },
+            });
           },
 
           toggleRestPause: (now) => {
@@ -222,8 +326,8 @@ export function createWorkoutStore(init: WorkoutInit) {
             set({
               rest:
                 rest.endsAt !== null
-                  ? { endsAt: now + next, duration, pausedRemaining: null }
-                  : { endsAt: null, duration, pausedRemaining: next },
+                  ? { ...rest, endsAt: now + next, duration, pausedRemaining: null }
+                  : { ...rest, endsAt: null, duration, pausedRemaining: next },
             });
           },
 

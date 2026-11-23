@@ -43,6 +43,18 @@ export interface ProgressionInput {
   targetSets: number;
   /** Крок зміни ваги, кг (наприклад, 2.5 або 5). */
   increment: number;
+  /**
+   * Обладнання вправи (exercises.equipment). Для тренажера й блока вага
+   * фізично кратна кроку (стек плит), тож рекомендація прив'язується до
+   * сітки кроку. Вільна вага — без прив'язки: 22.5 кг гантель при кроці 2
+   * — реальна вага.
+   */
+  equipment?: string;
+}
+
+/** Тренажер або блок: стек плит, вага лише кратна кроку. */
+export function isStackEquipment(equipment: string | null | undefined): boolean {
+  return equipment === "machine" || equipment === "cable";
 }
 
 export type SuggestionAction = "increase" | "same" | "deload" | "none";
@@ -52,7 +64,7 @@ export interface Suggestion {
   action: SuggestionAction;
   /** Рекомендована вага, кг; null — якщо історії немає. */
   weight: number | null;
-  /** Зміна відносно робочої ваги останнього тренування, кг (0 для 'same' і 'none'). */
+  /** Зміна відносно робочої ваги останнього тренування, кг (0 для 'none'; для 'same' — 0, якщо вага кратна кроку). */
   delta: number;
   /** Пояснення для користувача. */
   reason: string;
@@ -97,6 +109,32 @@ function missedRepMin(session: Session | undefined, repMin: number): boolean {
   return working !== null && working.sets.some((s) => s.reps < repMin);
 }
 
+/**
+ * Допуск «вага вже на сітці кроку», кг: вага користувача в lb, переведена
+ * в кг, трохи не збігається з сіткою (110 lb = 49.9 кг ≈ 50). Не більше
+ * чверті кроку, щоб для дрібних кроків сусідні значення не злипались.
+ */
+function gridTolerance(increment: number): number {
+  return Math.min(0.25, increment / 4);
+}
+
+/** Найбільше кратне кроку, що не перевищує x (з допуском). */
+function gridFloor(x: number, increment: number): number {
+  const tol = gridTolerance(increment);
+  return cleanFloat(Math.floor(cleanFloat((x + tol) / increment, 9)) * increment);
+}
+
+/** Найменше кратне кроку, не менше за x (з допуском). */
+function gridCeil(x: number, increment: number): number {
+  const tol = gridTolerance(increment);
+  return cleanFloat(Math.ceil(cleanFloat((x - tol) / increment, 9)) * increment);
+}
+
+/** Чи вага на сітці кроку (з допуском). */
+function onGrid(x: number, increment: number): boolean {
+  return Math.abs(x - roundToIncrement(x, increment)) <= gridTolerance(increment);
+}
+
 /** Форматує вагу для тексту пояснення: 62.5, 60 (без зайвих нулів). */
 function formatKg(weight: number): string {
   return String(cleanFloat(weight));
@@ -116,10 +154,18 @@ function formatKg(weight: number): string {
  *    з reps < repMin → 'deload' (≈ −10%, щонайменше на один крок, не менше 0).
  * 5. Інакше → 'same' (залишаємо w).
  *
+ * Для тренажера й блока (equipment) рекомендація завжди кратна кроку:
+ * якщо в історії вага не на сітці (12.5 кг на блоці з кроком 5), вона не
+ * тягнеться далі —
+ * increase → наступне кратне вище (15), same → кратне нижче (10),
+ * deload → −10% з округленням, але нижче за найближче кратне зверху.
+ *
  * Перевірка 'increase' стоїть раніше за 'deload', тож має пріоритет.
  */
 export function suggestNextWeight(input: ProgressionInput): Suggestion {
   const { history, repMin, repMax, targetSets, increment } = input;
+  // Прив'язка до сітки кроку — лише для тренажера / блока.
+  const snap = isStackEquipment(input.equipment);
 
   // Крок 1. Немає даних для розрахунку.
   const last = workingSets(history[0]);
@@ -139,7 +185,8 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
   const allAtTop =
     last.sets.length >= targetSets && last.sets.every((s) => s.reps >= repMax);
   if (allAtTop) {
-    const weight = cleanFloat(w + increment);
+    // Тренажер / блок — від кратного кроку знизу: 40 → 45, 12.5 → 15 (крок 5).
+    const weight = cleanFloat((snap ? gridFloor(w, increment) : w) + increment);
     return {
       action: "increase",
       weight,
@@ -153,8 +200,10 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
     // −10%, округлене до кроку диска…
     const rounded = roundToIncrement(0.9 * w, increment);
     // …але щонайменше на один крок легше (інакше для малих ваг
-    // округлення повернуло б ту саму вагу) і не менше нуля.
-    const weight = cleanFloat(Math.max(0, Math.min(rounded, w - increment)));
+    // округлення повернуло б ту саму вагу) і не менше нуля. Для тренажера /
+    // блока крок відраховуємо від кратного зверху — результат лишається на сітці.
+    const top = snap ? gridCeil(w, increment) : w;
+    const weight = cleanFloat(Math.max(0, Math.min(rounded, top - increment)));
     return {
       action: "deload",
       weight,
@@ -163,12 +212,14 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
     };
   }
 
-  // Крок 5. Продовжуємо працювати з тією самою вагою.
+  // Крок 5. Продовжуємо працювати з тією самою вагою. Тренажер / блок і вага
+  // не на сітці (12.5 при кроці 5) — кратне нижче: важчу вагу ще не опановано.
+  const weight = snap && !onGrid(w, increment) ? gridFloor(w, increment) : w;
   return {
     action: "same",
-    weight: w,
-    delta: 0,
-    reason: `Keep ${formatKg(w)} kg until all sets reach ${repMax} reps`,
+    weight,
+    delta: cleanFloat(weight - w),
+    reason: `Keep ${formatKg(weight)} kg until all sets reach ${repMax} reps`,
   };
 }
 

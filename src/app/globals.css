@@ -140,6 +140,49 @@
   }
   html {
     @apply font-sans;
+    /* Без масштабування подвійним тапом (і без затримки click ~300 мс) */
+    touch-action: manipulation;
+  }
+  /* Ефективний touch-action рахується лише до найближчого скрол-контейнера
+     (overflow-auto, drawer), тож контролам ставимо його явно. Утиліти
+     touch-none / touch-pan-* (ручки dnd-kit) — у шарі utilities, вони сильніші. */
+  button,
+  a,
+  label,
+  summary,
+  input,
+  textarea,
+  select,
+  [role="button"],
+  [role="tab"] {
+    touch-action: manipulation;
+  }
+}
+
+/* iPhone зумить сторінку при фокусі на полі з font-size < 16px.
+   На телефоні піднімаємо дрібні поля до 16px. Базове правило — у шарі base,
+   щоб більші утиліти (text-xl, text-2xl у степерах) лишалися; дрібні
+   утиліти перебиваємо окремим правилом поза шарами. */
+@media (max-width: 47.99rem) {
+  @layer base {
+    input,
+    textarea,
+    select,
+    [contenteditable]:not([contenteditable="false"]) {
+      font-size: 16px;
+    }
+  }
+
+  :is(input, textarea, select, [contenteditable]:not([contenteditable="false"])):is(
+      .text-xs,
+      .text-sm,
+      [class*="text-[11px]"],
+      [class*="text-[12px]"],
+      [class*="text-[13px]"],
+      [class*="text-[14px]"],
+      [class*="text-[15px]"]
+    ) {
+    font-size: 16px;
   }
 }
 

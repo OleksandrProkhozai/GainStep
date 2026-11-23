@@ -32,6 +32,8 @@ export interface ProgressionParams {
   targetSets: number;
   /** Крок ваги, кг. */
   increment: number;
+  /** Обладнання вправи — тренажер / блок прив'язується до сітки кроку. */
+  equipment?: string;
 }
 
 /** Тренування вправи з позначками рекордів і розвантаження. */

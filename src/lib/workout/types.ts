@@ -1,5 +1,6 @@
 import type { PersonalBest, Session } from "@/lib/progression";
 import type { Enums } from "@/types/database.types";
+import type { PlanSource } from "./plan";
 
 export type MuscleGroup = Enums<"muscle_group">;
 export type Equipment = Enums<"equipment_type">;
@@ -26,6 +27,12 @@ export interface WorkoutExercise {
   repMin: number;
   repMax: number;
   restSeconds: number;
+  /** Базова (багатосуглобова) вправа: 5:00 переходу замість 3:00. Старі стани без поля — ізолююча. */
+  isCompound?: boolean;
+  /** Власний відпочинок після вправи (program_exercises.transition_rest_seconds); null — авто. */
+  transitionRestSeconds?: number | null;
+  /** "added" — додана під час тренування (бейдж "Додано"); старі стани без поля — "program". */
+  source?: PlanSource;
   /**
    * Останні завершені тренування з цією вправою (від найновішого).
    * Алгоритму прогресії та колонці Previous достатньо двох.
@@ -73,6 +80,8 @@ export interface WorkoutInit {
   notes: string;
   exercises: WorkoutExercise[];
   savedSets: SavedSet[];
+  /** У тренування вже є workouts.exercise_plan; false — старе, склад дозаписується. */
+  planStored: boolean;
 }
 
 /** Параметри за замовчуванням для вправи, доданої під час тренування. */

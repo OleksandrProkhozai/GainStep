@@ -13,6 +13,7 @@ import {
   type Suggestion,
 } from "@/lib/progression";
 import { countPRExercises } from "./records";
+import { effectiveRest, transitionRest, type RestSettings } from "./rest";
 import type { SavedSet, WorkoutExercise, WorkoutSet } from "./types";
 
 export const WEIGHT_MAX_KG = 500;
@@ -48,6 +49,7 @@ export function getSuggestion(exercise: WorkoutExercise): Suggestion {
     repMax: exercise.repMax,
     targetSets: exercise.targetSets,
     increment: exercise.increment,
+    equipment: exercise.equipment,
   });
 }
 
@@ -244,4 +246,56 @@ export function nextPendingSet(
     if (set) return { exercise: exercises[i], set };
   }
   return null;
+}
+
+// ───────────── Відпочинок після підходу ─────────────
+
+/**
+ * Наступна вправа, у якої лишились невиконані підходи: спершу після
+ * `exerciseId` за порядком, потім (якщо користувач пропускав вправи) —
+ * з початку списку. null — невиконаних вправ більше немає.
+ */
+export function nextExerciseWithPending(
+  exercises: WorkoutExercise[],
+  sets: WorkoutSet[],
+  exerciseId: string,
+): WorkoutExercise | null {
+  const index = exercises.findIndex((e) => e.exerciseId === exerciseId);
+  const order = [...exercises.slice(index + 1), ...exercises.slice(0, Math.max(0, index))];
+  return order.find((e) => firstPending(sets, e.exerciseId) !== null) ?? null;
+}
+
+export type RestKind = "set" | "transition";
+
+export interface RestPlan {
+  kind: RestKind;
+  seconds: number;
+  /** Наступна вправа для підпису "Далі: …" (лише для переходу). */
+  nextExerciseId: string | null;
+}
+
+/**
+ * Який відпочинок запустити після того, як підхід вправи відмічено:
+ *  - перехідний (transitionRest) — лише коли ВСІ підходи вправи виконані
+ *    (порядок відмічання не важливий) і є наступна невиконана вправа;
+ *  - інакше — звичайний між підходами: effectiveRest(rest_seconds, мінімум).
+ */
+export function planRest(
+  exercise: WorkoutExercise,
+  exercises: WorkoutExercise[],
+  sets: WorkoutSet[],
+  settings: RestSettings,
+): RestPlan {
+  const setRest: RestPlan = {
+    kind: "set",
+    seconds: effectiveRest(exercise.restSeconds, settings.minRestSeconds),
+    nextExerciseId: null,
+  };
+  const own = setsOf(sets, exercise.exerciseId);
+  const allDone = own.length > 0 && own.every((s) => s.isCompleted);
+  if (!allDone) return setRest;
+  const next = nextExerciseWithPending(exercises, sets, exercise.exerciseId);
+  const seconds = transitionRest(exercise, settings, next !== null);
+  if (seconds === null) return setRest;
+  return { kind: "transition", seconds, nextExerciseId: next!.exerciseId };
 }

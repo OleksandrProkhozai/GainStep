@@ -23,7 +23,7 @@ import {
 } from "./parts";
 import { RestBar, useRestActive } from "./rest-timer";
 import { useCurrentExercise, type CurrentExercise } from "./use-workout-view";
-import { WorkoutMenu } from "./workout-menu";
+import { ExerciseMenu, WorkoutMenu } from "./workout-menu";
 
 const pill =
   "inline-flex h-14 items-center justify-center gap-2 rounded-full px-5 text-base font-bold transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40";
@@ -40,7 +40,7 @@ export function MobileView({
   const locale = useLocale();
   const fmt = useWeightFormat();
   const current = useCurrentExercise();
-  const { startedAt, requestFinish } = useScreen();
+  const { startedAt, requestFinish, openAddExercise } = useScreen();
   const goTo = useWorkout((s) => s.goTo);
   const addSet = useWorkout((s) => s.addSet);
   const resting = useRestActive();
@@ -85,7 +85,10 @@ export function MobileView({
           <SaveStatus />
         </div>
 
-        <ExerciseTags exercise={exercise} className="mt-4" />
+        <div className="mt-4 flex items-start gap-2">
+          <ExerciseTags exercise={exercise} className="min-w-0 flex-1" />
+          <ExerciseMenu exerciseId={exercise.exerciseId} className="-mt-1.5 -mr-2" />
+        </div>
         <SuggestionBanner
           exercise={exercise}
           suggestion={current.suggestion}
@@ -134,6 +137,15 @@ export function MobileView({
             </button>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={openAddExercise}
+          className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-medium text-foreground/80 active:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t("addExercise")}
+        </button>
       </main>
 
       <RestBar />
@@ -152,9 +164,9 @@ function SetList({ current }: { current: CurrentExercise }) {
 
   return (
     <div className="mt-5">
-      <div className="grid grid-cols-[28px_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 px-3 pb-2 text-sm text-muted-foreground">
-        <span>{t("col.set")}</span>
-        <span>{t("col.previous")}</span>
+      <div className="grid grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 px-3 pb-2 text-sm text-muted-foreground">
+        <span className="truncate">{t("col.set")}</span>
+        <span className="truncate">{t("col.previous")}</span>
         <span className="text-center">{fmt.unitLabel}</span>
         <span className="text-center">{t("col.reps")}</span>
         <span className="sr-only">{t("col.done")}</span>
@@ -170,7 +182,7 @@ function SetList({ current }: { current: CurrentExercise }) {
               onClick={() => expand(set.clientId)}
               aria-label={t("editSetN", { n: set.setNumber })}
               className={cn(
-                "grid min-h-14 w-full grid-cols-[28px_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 rounded-xl px-3 text-left transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
+                "grid min-h-14 w-full grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 rounded-xl px-3 text-left transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
                 set.isCompleted ? "bg-primary/13" : "bg-foreground/3.5",
               )}
             >

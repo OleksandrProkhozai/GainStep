@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Check, Loader2, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { ResponsiveModal } from "@/components/programs/responsive-modal";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { ExerciseFilters } from "./parts";
  * Вибір вправ для дня програми: ті самі пошук, фільтри й список, що в
  * бібліотеці. Мультивибір круглими чекбоксами; вправи, що вже є в дні, —
  * сірі "Added". Десктоп — Dialog, телефон — нижній лист.
+ * Той самий picker — на екрані тренування (свої заголовок, підпис "Вже є"
+ * і перемикач місця вставки в footer).
  */
 export function ExercisePicker({
   open,
@@ -28,6 +30,11 @@ export function ExercisePicker({
   exercises,
   addedIds,
   onAdd,
+  title,
+  description,
+  addedLabel,
+  footer,
+  loading = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,14 +42,22 @@ export function ExercisePicker({
   /** exercise_id, що вже є в цьому дні. */
   addedIds: ReadonlySet<string>;
   onAdd: (exercises: LibraryExercise[]) => void;
+  title?: string;
+  description?: string;
+  /** Підпис вправ, що вже є (за замовчуванням "Додано"). */
+  addedLabel?: string;
+  /** Додаткові елементи над кнопкою "Додати" (напр. місце вставки). */
+  footer?: ReactNode;
+  /** Бібліотека ще завантажується. */
+  loading?: boolean;
 }) {
   const t = useTranslations("exercises.picker");
   return (
     <ResponsiveModal
       open={open}
       onOpenChange={onOpenChange}
-      title={t("title")}
-      description={t("description")}
+      title={title ?? t("title")}
+      description={description ?? t("description")}
       srOnlyDescription
       className="lg:h-[80dvh] lg:max-w-xl"
     >
@@ -50,6 +65,9 @@ export function ExercisePicker({
         <PickerBody
           exercises={exercises}
           addedIds={addedIds}
+          addedLabel={addedLabel}
+          footer={footer}
+          loading={loading}
           onAdd={(list) => {
             onAdd(list);
             onOpenChange(false);
@@ -63,10 +81,16 @@ export function ExercisePicker({
 function PickerBody({
   exercises,
   addedIds,
+  addedLabel,
+  footer,
+  loading,
   onAdd,
 }: {
   exercises: LibraryExercise[];
   addedIds: ReadonlySet<string>;
+  addedLabel?: string;
+  footer?: ReactNode;
+  loading?: boolean;
   onAdd: (exercises: LibraryExercise[]) => void;
 }) {
   const t = useTranslations("exercises.picker");
@@ -125,7 +149,7 @@ function PickerBody({
                 </span>
                 {added ? (
                   <span className="shrink-0 rounded-full bg-foreground/10 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                    {t("added")}
+                    {addedLabel ?? t("added")}
                   </span>
                 ) : (
                   <span
@@ -142,7 +166,12 @@ function PickerBody({
             </li>
           );
         })}
-        {list.length === 0 && (
+        {loading && list.length === 0 && (
+          <li className="flex justify-center py-8 text-muted-foreground">
+            <Loader2 className="size-5 animate-spin" aria-label={t("loading")} />
+          </li>
+        )}
+        {!loading && list.length === 0 && (
           <li className="px-3 py-8 text-center text-sm text-muted-foreground">{t("noMatch")}</li>
         )}
       </ul>
@@ -158,6 +187,7 @@ function PickerBody({
           <Plus aria-hidden />
           {t("createCustom")}
         </Button>
+        {footer}
         <Button
           type="button"
           size="lg"

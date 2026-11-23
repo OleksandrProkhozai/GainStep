@@ -13,7 +13,13 @@ import { formatRest, formatScheme, type DraftExercise } from "@/lib/programs/dra
 import type { NextChip as NextChipData } from "@/lib/programs/next";
 import { PROGRAM_LIMITS as L } from "@/lib/programs/schema";
 import { cn } from "@/lib/utils";
-import { effectiveRest, isRaisedByMin } from "@/lib/workout/rest";
+import {
+  autoTransitionRest,
+  effectiveRest,
+  isRaisedByMin,
+  stepTransitionRest,
+  TRANSITION_REST,
+} from "@/lib/workout/rest";
 
 // ───────────── Чип Next ─────────────
 
@@ -92,6 +98,7 @@ export function Stepper({
   label,
   value,
   display,
+  muted,
   onDecrement,
   onIncrement,
   canDecrement,
@@ -100,6 +107,8 @@ export function Stepper({
   label: string;
   value: number;
   display?: string;
+  /** Сіре значення (наприклад, "Авто · 5:00"). */
+  muted?: boolean;
   onDecrement: () => void;
   onIncrement: () => void;
   canDecrement: boolean;
@@ -115,7 +124,13 @@ export function Stepper({
         <button type="button" onClick={onDecrement} disabled={!canDecrement} aria-label={t("decrease", { label: label.toLocaleLowerCase() })} className={btn}>
           <Minus className="size-4" aria-hidden />
         </button>
-        <output aria-live="polite" className="min-w-8 flex-1 text-center text-[15px] font-bold tabular-nums">
+        <output
+          aria-live="polite"
+          className={cn(
+            "min-w-8 flex-1 text-center text-[15px] font-bold whitespace-nowrap tabular-nums",
+            muted && "font-semibold text-muted-foreground",
+          )}
+        >
           {display ?? value}
         </output>
         <button type="button" onClick={onIncrement} disabled={!canIncrement} aria-label={t("increase", { label: label.toLocaleLowerCase() })} className={btn}>
@@ -126,7 +141,7 @@ export function Stepper({
   );
 }
 
-type Patch = Partial<Pick<DraftExercise, "targetSets" | "repMin" | "repMax" | "restSeconds">>;
+type Patch = Partial<Pick<DraftExercise, "targetSets" | "repMin" | "repMax" | "restSeconds" | "transitionRestSeconds">>;
 
 // ───────────── Рядок вправи ─────────────
 
@@ -171,6 +186,10 @@ export function ExerciseRow({
   const rest = effectiveRest(e.restSeconds, minRest);
   const raised = isRaisedByMin(e.restSeconds, minRest);
   const restFloor = Math.max(L.restMin, minRest);
+  // Відпочинок після вправи: null — "Авто" (5:00 базова / 3:00 ізолююча).
+  const autoTransition = autoTransitionRest(e);
+  const ownTransition = e.transitionRestSeconds;
+  const transitionValue = ownTransition ?? autoTransition;
 
   // Плитка + текст + Next: на sm+ — один рядок, на телефоні Next під метриками.
   const body = (
@@ -280,6 +299,30 @@ export function ExerciseRow({
               onDecrement={() => onChange({ repMax: e.repMax - 1 })}
               onIncrement={() => onChange({ repMax: e.repMax + 1 })}
             />
+          </div>
+          <div className="mt-3 grid gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="sm:max-w-[240px]">
+              <Stepper
+                label={t("transitionRest")}
+                value={transitionValue}
+                display={ownTransition === null ? t("transitionAuto", { time: formatRest(autoTransition) }) : formatRest(ownTransition)}
+                muted={ownTransition === null}
+                canDecrement={transitionValue > TRANSITION_REST.min}
+                canIncrement={transitionValue < TRANSITION_REST.max}
+                onDecrement={() => onChange({ transitionRestSeconds: stepTransitionRest(transitionValue, -1) })}
+                onIncrement={() => onChange({ transitionRestSeconds: stepTransitionRest(transitionValue, 1) })}
+              />
+            </div>
+            {ownTransition !== null && (
+              <button
+                type="button"
+                onClick={() => onChange({ transitionRestSeconds: null })}
+                className="h-11 justify-self-start rounded-full px-4 text-sm font-semibold text-accent-text transition hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none sm:justify-self-end"
+              >
+                {t("transitionReset")}
+              </button>
+            )}
+            <p className="text-xs text-muted-foreground sm:col-span-2">{t("transitionHint")}</p>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             {showWeightStep ? (

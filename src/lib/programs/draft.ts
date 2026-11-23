@@ -5,7 +5,7 @@
  */
 
 import type { Equipment, MuscleGroup } from "@/lib/exercises/catalog";
-import { effectiveRest } from "@/lib/workout/rest";
+import { effectiveRest, TRANSITION_REST, transitionRest } from "@/lib/workout/rest";
 import { PROGRAM_LIMITS as L, type SaveProgramPayload } from "./schema";
 
 export interface DraftExercise {
@@ -29,6 +29,10 @@ export interface DraftExercise {
   repMin: number;
   repMax: number;
   restSeconds: number;
+  /** Базова вправа (exercises.is_compound): авто-перехід 5:00 замість 3:00. */
+  isCompound: boolean;
+  /** Відпочинок після вправи (program_exercises.transition_rest_seconds); null — авто. */
+  transitionRestSeconds: number | null;
 }
 
 export interface DraftDay {
@@ -68,13 +72,20 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
  */
 export function patchExercise(
   ex: DraftExercise,
-  patch: Partial<Pick<DraftExercise, "targetSets" | "repMin" | "repMax" | "restSeconds">>,
+  patch: Partial<Pick<DraftExercise, "targetSets" | "repMin" | "repMax" | "restSeconds" | "transitionRestSeconds">>,
 ): DraftExercise {
   const next = { ...ex };
   if (patch.targetSets !== undefined) next.targetSets = clamp(patch.targetSets, L.setsMin, L.setsMax);
   if (patch.repMin !== undefined) next.repMin = clamp(patch.repMin, L.repsMin, next.repMax);
   if (patch.repMax !== undefined) next.repMax = clamp(patch.repMax, next.repMin, L.repsMax);
   if (patch.restSeconds !== undefined) next.restSeconds = clamp(patch.restSeconds, L.restMin, L.restMax);
+  // null — "Скинути на авто"; число — власне значення в межах 0:00–15:00.
+  if (patch.transitionRestSeconds !== undefined) {
+    next.transitionRestSeconds =
+      patch.transitionRestSeconds === null
+        ? null
+        : clamp(patch.transitionRestSeconds, TRANSITION_REST.min, TRANSITION_REST.max);
+  }
   return next;
 }
 
@@ -161,6 +172,7 @@ export function buildSavePayload(draft: ProgramDraft): SaveProgramPayload {
         rep_min: e.repMin,
         rep_max: e.repMax,
         rest_seconds: e.restSeconds,
+        transition_rest_seconds: e.transitionRestSeconds,
       })),
     })),
   };
@@ -210,7 +222,8 @@ export function describeChanges(saved: ProgramDraft, draft: ProgramDraft) {
             p.target_sets !== e.target_sets ||
             p.rep_min !== e.rep_min ||
             p.rep_max !== e.rep_max ||
-            p.rest_seconds !== e.rest_seconds
+            p.rest_seconds !== e.rest_seconds ||
+            p.transition_rest_seconds !== e.transition_rest_seconds
           );
         })
         .map(({ e }) => e.id!),
@@ -223,32 +236,43 @@ export function describeChanges(saved: ProgramDraft, draft: ProgramDraft) {
 /** Секунд на сам підхід (до відпочинку) в оцінці тривалості. */
 export const SET_WORK_SECONDS = 40;
 
+/** Поля вправи, потрібні для оцінки тривалості. */
+export type EstimateExercise = Pick<DraftExercise, "targetSets" | "restSeconds"> &
+  Partial<Pick<DraftExercise, "isCompound" | "transitionRestSeconds">>;
+
 /**
  * Орієнтовна тривалість дня, хв: сума по вправах
  * sets × (ефективний відпочинок + 40 с), округлена до 5 хв.
  * Ефективний відпочинок — effectiveRest(rest_seconds, мінімум з налаштувань).
+ * З увімкненим перехідним відпочинком після останнього підходу кожної
+ * вправи, КРІМ останньої, замість звичайного відпочинку — transitionRest().
  */
 export function estimateDayMinutes(
-  exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[],
+  exercises: readonly EstimateExercise[],
   minRestSeconds = 0,
+  transitionRestEnabled = false,
 ) {
-  const seconds = exercises.reduce(
-    (sum, e) => sum + e.targetSets * (effectiveRest(e.restSeconds, minRestSeconds) + SET_WORK_SECONDS),
-    0,
-  );
+  const settings = { minRestSeconds, transitionRestEnabled };
+  const seconds = exercises.reduce((sum, e, i) => {
+    const rest = effectiveRest(e.restSeconds, minRestSeconds);
+    let total = sum + e.targetSets * (rest + SET_WORK_SECONDS);
+    const transition = transitionRest(e, settings, i < exercises.length - 1);
+    if (transition !== null) total += transition - rest;
+    return total;
+  }, 0);
   return Math.round(seconds / 60 / 5) * 5;
 }
 
-/** "6 exercises · 20 sets · ~65 min". */
 /** Зведення дня для рядка "5 exercises · 15 sets · ~40 min" (текст — у компоненті). */
 export function dayStats(
-  exercises: readonly Pick<DraftExercise, "targetSets" | "restSeconds">[],
+  exercises: readonly EstimateExercise[],
   minRestSeconds = 0,
+  transitionRestEnabled = false,
 ) {
   return {
     exercises: exercises.length,
     sets: exercises.reduce((s, e) => s + e.targetSets, 0),
-    minutes: estimateDayMinutes(exercises, minRestSeconds),
+    minutes: estimateDayMinutes(exercises, minRestSeconds, transitionRestEnabled),
   };
 }
 

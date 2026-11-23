@@ -7,6 +7,7 @@ import { Check, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { PendingButton } from "@/components/programs/pending-button";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -46,6 +47,8 @@ export interface SettingsInitial {
   unit: WeightUnit;
   /** Мінімальний відпочинок, с (0 — вимкнено). */
   minRestSeconds: number;
+  /** "Довший відпочинок між вправами". */
+  transitionRestEnabled: boolean;
   /** Поточна мова інтерфейсу (профіль / cookie / Accept-Language). */
   locale: Locale;
 }
@@ -353,7 +356,8 @@ function ProfileCard({ initial }: { initial: SettingsInitial }) {
 function PreferencesCard({ initial }: { initial: SettingsInitial }) {
   const t = useTranslations("settings.preferences");
   const { status, save } = useProfileSaver();
-  const ids = { unit: useId(), rest: useId(), language: useId() };
+  const ids = { unit: useId(), rest: useId(), language: useId(), transition: useId(), transitionHint: useId() };
+  const [transition, setTransition] = useState(initial.transitionRestEnabled);
   const [locale, setLocale] = useState<Locale>(initial.locale);
 
   const [unit, setUnit] = useState<WeightUnit>(initial.unit);
@@ -379,6 +383,13 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
     const prev = locale;
     setLocale(next);
     void save({ locale: next }, () => setLocale(prev));
+  };
+
+  /** Перемикач перехідного відпочинку — автозбереження з відкатом при помилці. */
+  const changeTransition = (next: boolean) => {
+    const prev = transition;
+    setTransition(next);
+    void save({ transitionRestEnabled: next }, () => setTransition(prev));
   };
 
   const changeRest = (direction: 1 | -1) => {
@@ -447,6 +458,22 @@ function PreferencesCard({ initial }: { initial: SettingsInitial }) {
           </button>
         </div>
       </Row>
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <label htmlFor={ids.transition} className="text-sm font-medium text-foreground/85">
+            {t("transitionRest")}
+          </label>
+          <p id={ids.transitionHint} className="mt-0.5 text-xs text-muted-foreground">
+            {t("transitionRestHint")}
+          </p>
+        </div>
+        <Switch
+          id={ids.transition}
+          checked={transition}
+          onCheckedChange={changeTransition}
+          aria-describedby={ids.transitionHint}
+        />
+      </div>
     </SettingsCard>
   );
 }

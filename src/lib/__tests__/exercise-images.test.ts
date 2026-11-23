@@ -46,7 +46,7 @@ describe("шлях фото в bucket", () => {
   });
 
   it("форма вправи: фото необов'язкове, чужий формат відхиляється", () => {
-    const base = { name: "Cable Fly", muscleGroup: "chest", equipment: "cable", weightStep: 2.5, unit: "kg" } as const;
+    const base = { name: "Cable Fly", muscleGroup: "chest", equipment: "cable", weightStep: 5, unit: "kg" } as const;
     expect(exerciseFormSchema.parse(base).imagePath).toBeNull();
     expect(exerciseFormSchema.parse({ ...base, imagePath: `${USER}/${FILE}.webp` }).imagePath).toBe(`${USER}/${FILE}.webp`);
     expect(exerciseFormSchema.safeParse({ ...base, imagePath: "../secret.png" }).error?.issues[0]?.message).toBe(

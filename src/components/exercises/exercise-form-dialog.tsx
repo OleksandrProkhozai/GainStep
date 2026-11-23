@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { createExercise, updateExercise } from "@/lib/exercises/actions";
 import {
+  DEFAULT_STEP_KG,
   EQUIPMENT,
   exerciseFormSchema,
+  minStepKg,
   MUSCLE_GROUPS,
   type Equipment,
   type LibraryExercise,
@@ -21,7 +23,7 @@ import { ImagePicker } from "@/components/images/image-picker";
 import { useImageDraft } from "@/components/images/use-image-draft";
 import { EXERCISE_IMAGES_BUCKET } from "@/lib/exercises/images";
 import { ExerciseThumb } from "./exercise-thumb";
-import { formatWeightValue, inputToKg, unitLabel, weightStep, type WeightUnit } from "@/lib/units";
+import { formatWeightValue, inputToKg, toInputWeight, unitLabel, type WeightUnit } from "@/lib/units";
 import { cn } from "@/lib/utils";
 
 const field =
@@ -95,9 +97,34 @@ function ExerciseForm({
   const [name, setName] = useState(exercise?.name ?? initialName);
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(exercise?.muscleGroup ?? "chest");
   const [equipment, setEquipment] = useState<Equipment>(exercise?.equipment ?? "barbell");
-  const [step, setStep] = useState(() =>
-    exercise ? formatWeightValue(exercise.incrementKg, unit) : String(weightStep(2.5, unit)),
-  );
+  // Крок у кг, який зараз показує поле: незмінене поле відправляє саме його
+  // (2.5 kg показується як 5.5 lb — без цього збереження дало б 2.49 kg).
+  const [stepBaseKg, setStepBaseKg] = useState(exercise?.incrementKg ?? DEFAULT_STEP_KG.barbell);
+  const [step, setStep] = useState(() => formatWeightValue(stepBaseKg, unit));
+  // Користувач сам змінював крок — обладнання його більше не перезаписує.
+  const [stepTouched, setStepTouched] = useState(false);
+
+  const setStepKg = (kg: number) => {
+    setStepBaseKg(kg);
+    setStep(formatWeightValue(kg, unit));
+  };
+
+  /** Крок із поля в кг; для тренажера / блока 11 lb (= 4.99 кг) — це рівно 5 кг. */
+  const stepToKg = (eq: Equipment) => {
+    const value = Number(step.replace(",", "."));
+    const kg = inputToKg(value, unit, stepBaseKg);
+    const min = minStepKg(eq);
+    return kg < min && value >= toInputWeight(min, unit) ? min : kg;
+  };
+
+  const changeEquipment = (eq: Equipment) => {
+    setEquipment(eq);
+    if (!exercise && !stepTouched) {
+      setStepKg(DEFAULT_STEP_KG[eq]);
+    } else if (stepToKg(eq) < minStepKg(eq)) {
+      setStepKg(minStepKg(eq));
+    }
+  };
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -107,9 +134,8 @@ function ExerciseForm({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Крок відправляємо в кг: незмінене поле лишає початкове значення
-    // (2.5 kg показується як 5.5 lb — без цього збереження дало б 2.49 kg).
-    const stepKg = inputToKg(Number(step.replace(",", ".")), unit, exercise?.incrementKg);
+    // Крок відправляємо в кг.
+    const stepKg = stepToKg(equipment);
     const input = { name, muscleGroup, equipment, weightStep: stepKg, unit: "kg" as const, imagePath: image.path };
     const parsed = exerciseFormSchema.safeParse(input);
     if (!parsed.success) {
@@ -188,7 +214,7 @@ function ExerciseForm({
               <select
                 id={`${id}-equipment`}
                 value={equipment}
-                onChange={(e) => setEquipment(e.target.value as Equipment)}
+                onChange={(e) => changeEquipment(e.target.value as Equipment)}
                 className={cn(field, "appearance-none pr-11")}
               >
                 {EQUIPMENT.map((eq) => (
@@ -211,7 +237,10 @@ function ExerciseForm({
               value={step}
               onChange={(e) => {
                 const text = e.target.value.replace(",", ".");
-                if (/^\d*\.?\d{0,2}$/.test(text)) setStep(text);
+                if (/^\d*\.?\d{0,2}$/.test(text)) {
+                  setStep(text);
+                  setStepTouched(true);
+                }
               }}
               inputMode="decimal"
               autoComplete="off"

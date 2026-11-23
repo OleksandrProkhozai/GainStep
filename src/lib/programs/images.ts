@@ -14,7 +14,7 @@ import { programImage } from "./template-images";
 export const PROGRAM_IMAGES_BUCKET = "program-images";
 
 /** Картинка власної програми за замовчуванням (оригінал — assets/programs/). */
-export const CUSTOM_PROGRAM_IMAGE = "/programs/custom-default.webp";
+export const CUSTOM_PROGRAM_IMAGE = "/programs/default.webp";
 
 /** Public URL фото програми; без шляху — null. */
 export function programImageUrl(path: string | null | undefined, supabaseUrl?: string): string | null {

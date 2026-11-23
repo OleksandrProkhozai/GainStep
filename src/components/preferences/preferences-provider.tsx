@@ -8,6 +8,8 @@ export interface ClientPreferences {
   unit: WeightUnit;
   /** Мінімальний відпочинок, с (0 — вимкнено). */
   minRestSeconds: number;
+  /** "Довший відпочинок між вправами" (перехідний таймер). */
+  transitionRestEnabled: boolean;
 }
 
 const PreferencesContext = createContext<Promise<ClientPreferences> | null>(null);
@@ -46,4 +48,9 @@ export function useUnit(): WeightUnit {
  */
 export function useMinRest(): number {
   return usePreferences().minRestSeconds;
+}
+
+/** Чи вмикати перехідний відпочинок між вправами (Settings → "Довший відпочинок між вправами"). */
+export function useTransitionRestEnabled(): boolean {
+  return usePreferences().transitionRestEnabled;
 }

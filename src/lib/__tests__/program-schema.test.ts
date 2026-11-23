@@ -13,6 +13,7 @@ const exercise = (exercise_id = EX_A, overrides: Partial<SaveProgramPayload["day
   rep_min: 8,
   rep_max: 12,
   rest_seconds: 90,
+  transition_rest_seconds: null,
   ...overrides,
 });
 
