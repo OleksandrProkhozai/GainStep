@@ -15,9 +15,11 @@ import {
   workingSets,
   type PersonalBest,
   type Session,
+  type ProgressionInput,
   type SetResult,
   type Suggestion,
 } from "@/lib/progression";
+import { progressionIncrementKg, type WeightUnit } from "@/lib/units";
 import { countPRExercises, type ExercisePRInput } from "./records";
 
 // ───────────────────────────── Вхід ─────────────────────────────
@@ -61,6 +63,8 @@ export interface SummaryInput {
   sets: readonly SummarySetInput[];
   /** Попереднє завершене тренування того самого дня програми (або null). */
   previous: { sets: readonly VolumeSet[] } | null;
+  /** Одиниці користувача: для lb крок "Наступного разу" — 5 / 2.5 lb. За замовчуванням kg. */
+  unit?: WeightUnit;
 }
 
 // ───────────────────────────── Вихід ─────────────────────────────
@@ -69,6 +73,8 @@ export interface SummaryInput {
 export interface NextTime extends Suggestion {
   /** Робоча вага цього тренування, кг (null — якщо виконаних підходів немає). */
   today: number | null;
+  /** Вхід алгоритму (це тренування + попередні) — для пояснення "Чому така вага?". */
+  input: ProgressionInput;
 }
 
 export interface SummarySet extends SetResult {
@@ -163,15 +169,16 @@ export function buildWorkoutSummary(input: SummaryInput): WorkoutSummary {
       }
     }
 
-    const current: Session = { sets: own };
-    const suggestion = suggestNextWeight({
+    const current: Session = { sets: own, startedAt: input.startedAt };
+    const progression: ProgressionInput = {
       history: [current, ...ex.history],
       repMin: ex.repMin,
       repMax: ex.repMax,
       targetSets: ex.targetSets,
-      increment: ex.increment,
+      increment: progressionIncrementKg(ex.increment, input.unit ?? "kg"),
       equipment: ex.equipment,
-    });
+    };
+    const suggestion = suggestNextWeight(progression);
 
     exercises.push({
       exerciseId: ex.exerciseId,
@@ -182,7 +189,7 @@ export function buildWorkoutSummary(input: SummaryInput): WorkoutSummary {
       sets,
       bestE1RM: Math.max(0, ...own.map((s) => epley1RM(s.weight, s.reps))),
       record,
-      next: { ...suggestion, today: workingSets(current)?.weight ?? null },
+      next: { ...suggestion, today: workingSets(current)?.weight ?? null, input: progression },
     });
   }
 

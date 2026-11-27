@@ -170,12 +170,20 @@ describe("buildWorkoutSummary — Next time", () => {
     expect(s.exercises[0].next).toMatchObject({ action: "same", today: 22.5, weight: 22.5, delta: 0 });
   });
 
-  it("deload: нижче rep_min у цьому і попередньому тренуваннях", () => {
+  it("deload: невдале (≥ 2 підходи ≤ rep_min − 2) і це, і попереднє тренування", () => {
     const s = build({
-      exercises: [exercise("ohp", [session(40, 8, 7, 6)])],
+      exercises: [exercise("ohp", [session(40, 8, 6, 6)])],
       sets: sets("ohp", 40, 7, 6, 6),
     });
     expect(s.exercises[0].next).toMatchObject({ action: "deload", today: 40, weight: 35, delta: -5 });
+  });
+
+  it("старе правило: один підхід < rep_min в обох тренуваннях — тепер same", () => {
+    const s = build({
+      exercises: [exercise("ohp", [session(40, 8, 7, 6)])],
+      sets: sets("ohp", 40, 9, 7, 6),
+    });
+    expect(s.exercises[0].next).toMatchObject({ action: "same", today: 40, weight: 40 });
   });
 
   it("недобір лише в цьому тренуванні — ще не deload", () => {

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { localizedName } from "@/lib/i18n/names";
 import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { pickNextDay } from "@/lib/dashboard/queries";
+import { listMyPrograms } from "@/lib/programs/active";
 import { sessionVolume } from "@/lib/metrics";
 import type { Database } from "@/types/database.types";
 
@@ -31,7 +32,10 @@ export type HubRecent = {
 };
 
 export type WorkoutsHubData = {
+  /** Активна програма; null — її немає (наприклад, видалили): шаблон не підставляємо. */
   program: { id: string; name: string; days: HubDay[] } | null;
+  /** Власні програми — перемикач активної і порожній стан «Виберіть активну програму». */
+  myPrograms: { id: string; name: string }[];
   active: { id: string; name: string; startedAt: string } | null;
   recent: HubRecent[];
 };
@@ -49,7 +53,7 @@ export async function getWorkoutsHubData(
   /** Мова назв системних вправ (name_uk). */
   locale = "en",
 ): Promise<WorkoutsHubData> {
-  const [profileRes, activeRes, recentRes, templateNames] = await Promise.all([
+  const [profileRes, activeRes, recentRes, templateNames, myPrograms] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -78,6 +82,7 @@ export async function getWorkoutsHubData(
       .order("started_at", { ascending: false })
       .limit(RECENT_LIMIT),
     getTemplateNames(supabase),
+    listMyPrograms(supabase, userId),
   ]);
   // Стандартні назви копій шаблонів і тренувань — мовою інтерфейсу.
   const tn = (name: string) => templateName(name, templateNames, locale);
@@ -143,6 +148,7 @@ export async function getWorkoutsHubData(
           }),
         }
       : null,
+    myPrograms: myPrograms.map((p) => ({ id: p.id, name: tn(p.name) })),
     active: activeRes.data
       ? { id: activeRes.data.id, name: tn(activeRes.data.name), startedAt: activeRes.data.started_at }
       : null,

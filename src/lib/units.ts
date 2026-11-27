@@ -108,6 +108,15 @@ export function weightStep(incrementKg: number, unit: WeightUnit) {
   return incrementKg < 2.5 ? 2.5 : 5;
 }
 
+/**
+ * Крок прогресії, кг, з урахуванням одиниць. Для kg — крок вправи. Для lb —
+ * крок степера (5 lb, для дрібних кроків 2.5 lb), переведений у кг: інакше
+ * 135 lb + 2.5 кг дали б 140.5 lb, а не 140, і deload не лягав би на сітку lb.
+ */
+export function progressionIncrementKg(incrementKg: number, unit: WeightUnit) {
+  return unit === "kg" ? incrementKg : fromDisplayWeight(weightStep(incrementKg, unit), unit);
+}
+
 /** Усі форматери ваги для конкретних одиниць і мови (клієнт: useWeightFormat). */
 export function createWeightFormat(unit: WeightUnit, locale: NumberLocale) {
   return {

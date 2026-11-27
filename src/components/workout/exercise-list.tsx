@@ -41,7 +41,7 @@ export function ExerciseList({ onPick }: { onPick?: () => void }) {
               >
                 <ExerciseThumb exercise={exercise} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold">{exerciseName(exercise, locale)}</span>
+                  <span className="line-clamp-2 text-[15px] leading-snug font-semibold break-words">{exerciseName(exercise, locale)}</span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     {t("setsProgress", { done, total })}
                     {exercise.source === "added" && <AddedBadge />}

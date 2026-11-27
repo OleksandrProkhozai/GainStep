@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Camera, CircleCheck, Copy, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Camera, Copy, Loader2, MoreHorizontal, Pencil, Star, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteProgram, duplicateProgram, setActiveProgram } from "@/lib/programs/actions";
+import { deleteProgram, duplicateProgram } from "@/lib/programs/actions";
 
 /** Меню «…» редактора: Set as active, Rename, Change photo, Duplicate, Delete. */
 export function ProgramMenu({
@@ -31,12 +31,15 @@ export function ProgramMenu({
   name,
   isActive,
   dirty,
+  onSetActive,
   onRename,
   onChangePhoto,
 }: {
   programId: string;
   name: string;
   isActive: boolean;
+  /** «Зробити активною» — спільна оптимістична дія редактора (ActiveProgramProvider). */
+  onSetActive: () => void;
   /** Є незбережені зміни — Duplicate копіює збережену версію, попереджаємо. */
   dirty: boolean;
   onRename: () => void;
@@ -67,8 +70,8 @@ export function ProgramMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           {!isActive && (
-            <DropdownMenuItem onSelect={() => run(() => setActiveProgram(programId), t("activated"))}>
-              <CircleCheck aria-hidden />
+            <DropdownMenuItem onSelect={onSetActive}>
+              <Star aria-hidden />
               {t("setActive")}
             </DropdownMenuItem>
           )}

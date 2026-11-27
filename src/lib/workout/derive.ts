@@ -9,9 +9,11 @@ import { epley1RM, sessionVolume } from "@/lib/metrics";
 import {
   markPRs,
   suggestNextWeight,
+  withCompletedSets,
   type SetResult,
   type Suggestion,
 } from "@/lib/progression";
+import { progressionIncrementKg, type WeightUnit } from "@/lib/units";
 import { countPRExercises } from "./records";
 import { effectiveRest, transitionRest, type RestSettings } from "./rest";
 import type { SavedSet, WorkoutExercise, WorkoutSet } from "./types";
@@ -41,24 +43,37 @@ export function newClientId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Рекомендація алгоритму подвійної прогресії для вправи. */
-export function getSuggestion(exercise: WorkoutExercise): Suggestion {
-  return suggestNextWeight({
+/**
+ * Вхід алгоритму для вправи тренування: діапазон і кількість підходів — з
+ * плану ЦЬОГО тренування (exercise_plan / день програми / дефолт доданої),
+ * крок — exercises.weight_increment з урахуванням одиниць (lb → 5 lb).
+ */
+export function progressionInput(exercise: WorkoutExercise, unit: WeightUnit = "kg") {
+  return {
     history: exercise.history,
     repMin: exercise.repMin,
     repMax: exercise.repMax,
     targetSets: exercise.targetSets,
-    increment: exercise.increment,
+    increment: progressionIncrementKg(exercise.increment, unit),
     equipment: exercise.equipment,
-  });
+  };
 }
 
-/** Підхід з тим самим номером з останнього тренування (колонка Previous). */
+/** Рекомендація алгоритму подвійної прогресії для вправи. */
+export function getSuggestion(exercise: WorkoutExercise, unit: WeightUnit = "kg"): Suggestion {
+  return suggestNextWeight(progressionInput(exercise, unit));
+}
+
+/**
+ * Підхід з тим самим номером з останнього тренування (колонка Previous).
+ * Лише виконані підходи; тренування, де вправу пропустили, — не "минулий раз"
+ * (збережені на пристрої старі стани могли містити й невиконані).
+ */
 export function previousSet(
   exercise: WorkoutExercise,
   setNumber: number,
 ): SetResult | null {
-  return exercise.history[0]?.sets[setNumber - 1] ?? null;
+  return withCompletedSets(exercise.history)[0]?.sets[setNumber - 1] ?? null;
 }
 
 /**
@@ -72,8 +87,9 @@ export function previousSet(
 export function initialSets(
   exercise: WorkoutExercise,
   makeId: () => string = newClientId,
+  unit: WeightUnit = "kg",
 ): WorkoutSet[] {
-  const suggestion = getSuggestion(exercise);
+  const suggestion = getSuggestion(exercise, unit);
   const weightKg =
     suggestion.weight ??
     exercise.history[0]?.sets[0]?.weight ??
@@ -102,12 +118,13 @@ export function buildSets(
   exercises: WorkoutExercise[],
   saved: SavedSet[],
   makeId: () => string = newClientId,
+  unit: WeightUnit = "kg",
 ): WorkoutSet[] {
   return exercises.flatMap((exercise) => {
     const own = saved
       .filter((s) => s.exerciseId === exercise.exerciseId)
       .sort((a, b) => a.setNumber - b.setNumber);
-    if (own.length === 0) return initialSets(exercise, makeId);
+    if (own.length === 0) return initialSets(exercise, makeId, unit);
     return own.map((s, i) => ({
       clientId: makeId(),
       exerciseId: exercise.exerciseId,
@@ -170,10 +187,11 @@ export function appendSet(
   sets: WorkoutSet[],
   exercise: WorkoutExercise,
   makeId: () => string = newClientId,
+  unit: WeightUnit = "kg",
 ): WorkoutSet[] {
   const own = setsOf(sets, exercise.exerciseId);
   const last = own.at(-1);
-  const template = last ?? initialSets({ ...exercise, targetSets: 1 }, makeId)[0];
+  const template = last ?? initialSets({ ...exercise, targetSets: 1 }, makeId, unit)[0];
   return [
     ...sets,
     {

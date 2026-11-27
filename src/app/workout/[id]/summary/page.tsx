@@ -23,7 +23,7 @@ export default async function WorkoutSummaryPage({ params }: PageProps<"/workout
   if (!z.guid().safeParse(id).success) notFound();
 
   const [supabase, locale] = await Promise.all([createClient(), getLocale()]);
-  const result = await loadWorkoutSummary(supabase, id, user.id, locale);
+  const result = await loadWorkoutSummary(supabase, id, user.id, locale, user.unit);
   if (result.kind === "not-found") notFound();
   if (result.kind === "in-progress") redirect(`/workout/${id}`);
 

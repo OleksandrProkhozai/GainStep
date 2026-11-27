@@ -101,7 +101,7 @@ describe("buildSmartProgression", () => {
       [ex("bench"), ex("new"), ex("ohp"), ex("raise")],
       new Map([
         ["bench", [s(60, 12, 12, 12)]],
-        ["ohp", [s(40, 7, 6, 6), s(40, 7, 7, 6)]],
+        ["ohp", [s(40, 7, 6, 6), s(40, 6, 6, 8)]],
         ["raise", [s(10, 12, 10, 10)]],
       ]),
     );

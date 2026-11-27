@@ -40,8 +40,8 @@ function NextExercise({ exerciseId, compact }: { exerciseId: string | null; comp
   if (!exercise) return null;
   return (
     <span className={cn("flex min-w-0 items-center gap-2", !compact && "justify-center")}>
-      <ExerciseThumb exercise={exercise} size="sm" className={compact ? "size-6 rounded-md" : "size-8 rounded-lg"} />
-      <span className="truncate">{t("transitionNext", { name: exerciseName(exercise, locale) })}</span>
+      <ExerciseThumb exercise={exercise} size="sm" className={cn("shrink-0", compact ? "size-6 rounded-md" : "size-8 rounded-lg")} />
+      <span className="line-clamp-2 min-w-0 break-words">{t("transitionNext", { name: exerciseName(exercise, locale) })}</span>
     </span>
   );
 }
@@ -185,11 +185,11 @@ export function RestBar() {
           </RestRing>
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
+          <p className="line-clamp-2 text-sm font-semibold break-words">
             {paused ? t("paused") : transition ? t("transitionTitle") : t("restTime")}
           </p>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            {transition ? <NextExercise exerciseId={nextExerciseId} compact /> : <p className="truncate">{nextLabel}</p>}
+            {transition ? <NextExercise exerciseId={nextExerciseId} compact /> : <p className="line-clamp-2 break-words">{nextLabel}</p>}
           </div>
         </div>
         <div className="flex shrink-0 gap-1.5">

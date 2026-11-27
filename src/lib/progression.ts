@@ -5,8 +5,9 @@
  * Подвійна прогресія: для вправи задано діапазон повторень [repMin; repMax].
  * Спортсмен працює з однією вагою, поступово збільшуючи кількість повторень.
  * Коли в усіх робочих підходах досягнуто repMax — вага збільшується на крок,
- * а повторення знову «скидаються» до нижньої межі діапазону. Якщо ж двічі
- * поспіль не вдається навіть repMin — вага знижується приблизно на 10% (deload).
+ * а повторення знову «скидаються» до нижньої межі діапазону. Якщо ж
+ * DELOAD_SESSIONS тренувань поспіль були невдалими (сильний недобір до repMin
+ * у кількох підходах) — вага знижується приблизно на 10% (deload).
  *
  * Модуль складається лише з чистих функцій: без React, Supabase і поточної
  * дати. Усі ваги — в кг.
@@ -29,6 +30,8 @@ export interface SetResult {
 /** Одне тренування з історії конкретної вправи. */
 export interface Session {
   sets: SetResult[];
+  /** Початок тренування, ISO (для пояснення "Минулого разу (19 лист.)"); старі стани — без поля. */
+  startedAt?: string;
 }
 
 /** Вхідні параметри алгоритму прогресії. */
@@ -57,6 +60,33 @@ export function isStackEquipment(equipment: string | null | undefined): boolean 
   return equipment === "machine" || equipment === "cable";
 }
 
+/**
+ * Вправа без ваги: equipment = bodyweight і в історії немає виконаних
+ * підходів з вагою > 0. Зважені варіанти (віджимання з поясом) — звичайна
+ * прогресія. Невиконані підходи не рахуються: їхня вага — лише підставлене
+ * значення, а не піднята вага.
+ */
+export function isPureBodyweight(equipment: string | null | undefined, sessions: readonly Session[] = []): boolean {
+  return (
+    equipment === "bodyweight" && !sessions.some((s) => s.sets.some((set) => set.isCompleted && set.weight > 0))
+  );
+}
+
+/**
+ * Історія, придатна для алгоритму: у кожному тренуванні — лише виконані
+ * підходи, тренування без жодного виконаного підходу вправи (вправу
+ * пропустили) відкинуто. Порядок (від найновішого) зберігається, тож
+ * "два тренування поспіль" — це два тренування, де вправу справді робили.
+ */
+export function withCompletedSets(history: readonly Session[]): Session[] {
+  const result: Session[] = [];
+  for (const s of history) {
+    const sets = s.sets.filter((x) => x.isCompleted);
+    if (sets.length > 0) result.push(s.startedAt === undefined ? { sets } : { sets, startedAt: s.startedAt });
+  }
+  return result;
+}
+
 export type SuggestionAction = "increase" | "same" | "deload" | "none";
 
 /** Рекомендація на наступне тренування. */
@@ -81,6 +111,29 @@ export interface PersonalBest {
 /** Допуск для порівняння дробових чисел (1ПМ). */
 const EPSILON = 1e-9;
 
+// ──────────────────────── Правило розвантаження ────────────────────────
+
+/**
+ * На скільки повторень нижче repMin має бути підхід, щоб вважатися
+ * «сильним недобором»: reps ≤ repMin − DELOAD_REP_SHORTFALL (8–12 → ≤ 6).
+ * Недобір на 1 повторення (7 з 8) — звичайне коливання, не провал.
+ */
+export const DELOAD_REP_SHORTFALL = 2;
+
+/**
+ * Скільки робочих підходів із сильним недобором робить тренування невдалим.
+ * Для вправ з меншою кількістю цільових підходів поріг — min(цей, targetSets),
+ * тож вправа з 1 підходом провалюється одним підходом.
+ */
+export const DELOAD_MIN_FAILED_SETS = 2;
+
+/**
+ * Скільки невдалих тренувань поспіль (за датою, від найновішого) дають
+ * розвантаження −10%. Стільки ж останніх тренувань вправи передається
+ * алгоритму з бази.
+ */
+export const DELOAD_SESSIONS = 2;
+
 // ──────────────────────── Допоміжні функції ────────────────────────
 
 /** Лише виконані підходи тренування. */
@@ -103,10 +156,40 @@ export function workingSets(
   return { weight, sets: done.filter((s) => s.weight === weight) };
 }
 
-/** Чи був у тренуванні хоча б один робочий підхід із повтореннями < repMin. */
-function missedRepMin(session: Session | undefined, repMin: number): boolean {
+/** Межа «сильного недобору»: підхід з reps ≤ цього значення (repMin 8 → 6). */
+export function failRepsThreshold(repMin: number): number {
+  return repMin - DELOAD_REP_SHORTFALL;
+}
+
+/** Скільки підходів із сильним недобором робить тренування невдалим: min(2, targetSets), не менше 1. */
+export function failedSetsNeeded(targetSets: number): number {
+  return Math.max(1, Math.min(DELOAD_MIN_FAILED_SETS, targetSets));
+}
+
+/** Робочі підходи тренування з сильним недобором (reps ≤ repMin − DELOAD_REP_SHORTFALL). */
+export function shortfallSets(session: Session | undefined, repMin: number): SetResult[] {
   const working = workingSets(session);
-  return working !== null && working.sets.some((s) => s.reps < repMin);
+  const limit = failRepsThreshold(repMin);
+  return working === null ? [] : working.sets.filter((s) => s.reps <= limit);
+}
+
+/**
+ * Невдале тренування (FAILED SESSION): робочих підходів із сильним
+ * недобором не менше за min(DELOAD_MIN_FAILED_SETS, targetSets).
+ * При 8–12 × 3: 7/6/6 — невдале (два підходи ≤ 6); 6/9/10 — ні (лише
+ * один); 8/8/7 — ні (недобір лише 1 повторення).
+ */
+export function isFailedSession(session: Session | undefined, repMin: number, targetSets: number): boolean {
+  return shortfallSets(session, repMin).length >= failedSetsNeeded(targetSets);
+}
+
+/**
+ * Чи DELOAD_SESSIONS останніх тренувань поспіль (від найновішого) — усі
+ * невдалі. `history` — уже без пропущених тренувань (withCompletedSets).
+ */
+function failedInARow(history: readonly Session[], repMin: number, targetSets: number): boolean {
+  if (history.length < DELOAD_SESSIONS) return false;
+  return history.slice(0, DELOAD_SESSIONS).every((s) => isFailedSession(s, repMin, targetSets));
 }
 
 /**
@@ -150,9 +233,12 @@ function formatKg(weight: number): string {
  * 1. Немає історії або в останньому тренуванні немає виконаних підходів → 'none'.
  * 2. Робоча вага w = максимальна вага серед виконаних підходів останнього тренування.
  * 3. Якщо робочих підходів ≥ targetSets і в кожному reps ≥ repMax → 'increase' (w + increment).
- * 4. Інакше, якщо в ДВОХ останніх тренуваннях поспіль був робочий підхід
- *    з reps < repMin → 'deload' (≈ −10%, щонайменше на один крок, не менше 0).
- * 5. Інакше → 'same' (залишаємо w).
+ * 4. Інакше, якщо DELOAD_SESSIONS останніх тренувань поспіль — невдалі
+ *    (isFailedSession: ≥ min(DELOAD_MIN_FAILED_SETS, targetSets) робочих
+ *    підходів з reps ≤ repMin − DELOAD_REP_SHORTFALL) → 'deload'
+ *    (≈ −10%, щонайменше на один крок, не менше 0).
+ * 5. Інакше → 'same' (залишаємо w): недобір на 1 повторення, сильний
+ *    недобір лише в одному підході, одне невдале тренування тощо.
  *
  * Для тренажера й блока (equipment) рекомендація завжди кратна кроку:
  * якщо в історії вага не на сітці (12.5 кг на блоці з кроком 5), вона не
@@ -163,7 +249,10 @@ function formatKg(weight: number): string {
  * Перевірка 'increase' стоїть раніше за 'deload', тож має пріоритет.
  */
 export function suggestNextWeight(input: ProgressionInput): Suggestion {
-  const { history, repMin, repMax, targetSets, increment } = input;
+  const { repMin, repMax, targetSets, increment } = input;
+  // Тренування, де вправу пропустили (жодного виконаного підходу), не
+  // рахуються ні як "останнє", ні як "недобір".
+  const history = withCompletedSets(input.history);
   // Прив'язка до сітки кроку — лише для тренажера / блока.
   const snap = isStackEquipment(input.equipment);
 
@@ -176,6 +265,12 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
       delta: 0,
       reason: "No history yet — pick a starting weight",
     };
+  }
+
+  // Вправа з власною вагою без обтяження: прогресія лише в повтореннях,
+  // вагу не додаємо (інакше віджимання отримали б "+2.5 кг").
+  if (isPureBodyweight(input.equipment, history)) {
+    return { action: "same", weight: 0, delta: 0, reason: "Bodyweight — add reps" };
   }
 
   // Крок 2. Робоча вага останнього тренування.
@@ -195,8 +290,8 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
     };
   }
 
-  // Крок 4. Розвантаження: недобір повторень два тренування поспіль.
-  if (missedRepMin(history[0], repMin) && missedRepMin(history[1], repMin)) {
+  // Крок 4. Розвантаження: невдалі тренування DELOAD_SESSIONS разів поспіль.
+  if (failedInARow(history, repMin, targetSets)) {
     // −10%, округлене до кроку диска…
     const rounded = roundToIncrement(0.9 * w, increment);
     // …але щонайменше на один крок легше (інакше для малих ваг
@@ -208,7 +303,7 @@ export function suggestNextWeight(input: ProgressionInput): Suggestion {
       action: "deload",
       weight,
       delta: cleanFloat(weight - w),
-      reason: `Below ${repMin} reps two sessions in a row — deload −10%`,
+      reason: `${DELOAD_SESSIONS} failed sessions in a row (≤ ${failRepsThreshold(repMin)} reps) — deload −10%`,
     };
   }
 

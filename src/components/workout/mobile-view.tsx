@@ -48,30 +48,34 @@ export function MobileView({
   const { exercise } = current;
 
   return (
-    <div className="flex min-h-dvh flex-col overflow-x-hidden">
-      <header className="sticky top-0 z-30 grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-b border-foreground/5 bg-background/90 pt-[calc(env(safe-area-inset-top)+0.5rem)] pr-[calc(env(safe-area-inset-right)+0.75rem)] pb-2 pl-[calc(env(safe-area-inset-left)+0.75rem)] backdrop-blur-xl">
+    <div className="flex min-h-dvh min-w-0 flex-col overflow-x-clip">
+      <header className="sticky top-0 z-30 grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 border-b border-foreground/5 bg-background/90 pt-[calc(env(safe-area-inset-top)+0.5rem)] pr-[calc(env(safe-area-inset-right)+0.5rem)] pb-2 pl-[calc(env(safe-area-inset-left)+0.5rem)] backdrop-blur-xl">
         <Link
           href="/"
           aria-label={t("back")}
-          className="flex size-11 items-center justify-center rounded-full transition active:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+          className="flex size-11 shrink-0 items-center justify-center rounded-full transition active:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
         >
           <ChevronLeft className="size-7" aria-hidden />
         </Link>
+        {/* min-h — місце під 2 рядки назви + "3 з 7": шапка не стрибає при перемиканні вправ.
+            Шеврон — inline у кінці тексту, а не окремою колонкою: так назві лишається вся ширина. */}
         <button
           type="button"
           onClick={() => onSheetOpenChange(true)}
           aria-haspopup="dialog"
-          className="flex min-w-0 flex-col items-center rounded-xl px-2 py-1 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
+          className="flex min-h-[4.125rem] min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-1 focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none"
         >
-          <span className="flex max-w-full items-center gap-1">
-            <span className="truncate font-heading text-lg font-bold">{exerciseName(exercise, locale)}</span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="line-clamp-2 max-w-full min-w-0 text-center font-heading text-base leading-tight font-bold break-words">
+            {exerciseName(exercise, locale)}
+            <ChevronDown className="ml-1 inline size-4 shrink-0 align-[-2px] text-muted-foreground" aria-hidden />
           </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="mt-0.5 text-xs text-muted-foreground">
             {t("nOfTotal", { n: current.index + 1, total: current.total })}
           </span>
         </button>
-        <WorkoutMenu mobile />
+        <div className="shrink-0">
+          <WorkoutMenu mobile />
+        </div>
       </header>
 
       <main
@@ -80,14 +84,14 @@ export function MobileView({
           resting ? "pb-[calc(env(safe-area-inset-bottom)+7rem)]" : "pb-[calc(env(safe-area-inset-bottom)+1.5rem)]",
         )}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center justify-between gap-3">
           <WorkoutClock startedAt={startedAt} className="text-2xl" />
-          <SaveStatus />
+          <SaveStatus compact />
         </div>
 
-        <div className="mt-4 flex items-start gap-2">
+        <div className="mt-4 flex min-w-0 items-start gap-2">
           <ExerciseTags exercise={exercise} className="min-w-0 flex-1" />
-          <ExerciseMenu exerciseId={exercise.exerciseId} className="-mt-1.5 -mr-2" />
+          <ExerciseMenu exerciseId={exercise.exerciseId} className="-my-1.5" />
         </div>
         <SuggestionBanner
           exercise={exercise}
@@ -132,7 +136,7 @@ export function MobileView({
               onClick={() => goTo(current.index + 1)}
               className={cn(pill, "bg-primary text-primary-foreground")}
             >
-              <span className="truncate">{t("nextExercise")}</span>
+              <span className="line-clamp-2 break-words">{t("nextExercise")}</span>
               <ArrowRight className="size-4 shrink-0" aria-hidden />
             </button>
           )}
@@ -164,9 +168,10 @@ function SetList({ current }: { current: CurrentExercise }) {
 
   return (
     <div className="mt-5">
-      <div className="grid grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 px-3 pb-2 text-sm text-muted-foreground">
+      {/* На телефоні заголовки колонок не потрібні — картка підходу підписує поля сама. */}
+      <div className="hidden grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 px-3 pb-2 text-sm text-muted-foreground sm:grid">
         <span className="truncate">{t("col.set")}</span>
-        <span className="truncate">{t("col.previous")}</span>
+        <span className="whitespace-nowrap">{t("col.previous")}</span>
         <span className="text-center">{fmt.unitLabel}</span>
         <span className="text-center">{t("col.reps")}</span>
         <span className="sr-only">{t("col.done")}</span>
@@ -182,7 +187,7 @@ function SetList({ current }: { current: CurrentExercise }) {
               onClick={() => expand(set.clientId)}
               aria-label={t("editSetN", { n: set.setNumber })}
               className={cn(
-                "grid min-h-14 w-full grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 rounded-xl px-3 text-left transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
+                "grid min-h-14 w-full grid-cols-[2rem_minmax(0,1fr)_52px_40px_76px] sm:grid-cols-[3rem_minmax(0,1fr)_52px_40px_76px] items-center gap-1.5 rounded-xl px-3 text-left transition focus-visible:ring-3 focus-visible:ring-primary/40 focus-visible:outline-none",
                 set.isCompleted ? "bg-primary/13" : "bg-foreground/3.5",
               )}
             >
@@ -227,11 +232,14 @@ function ActiveSetCard({ set, current }: { set: WorkoutSet; current: CurrentExer
   const { exercise, prs } = current;
 
   return (
-    <div className="rounded-2xl border-2 border-primary bg-foreground/3 p-4">
-      <div className="flex items-center gap-3">
-        <p className="text-lg font-bold">{t("setN", { n: set.setNumber })}</p>
-        <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-          {t("previousValue", { value: formatSetResult(previousSet(exercise, set.setNumber), unit, locale) })}
+    <div className="min-w-0 rounded-2xl border-2 border-primary bg-foreground/3 p-3.5 sm:p-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <p className="shrink-0 text-lg font-bold">{t("setN", { n: set.setNumber })}</p>
+        <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-tight break-words text-muted-foreground">
+          {t("previousValue", {
+            // "62,5 × 12" переноситься лише цілим
+            value: formatSetResult(previousSet(exercise, set.setNumber), unit, locale).replaceAll(" ", "\u00a0"),
+          })}
         </p>
         {prs.has(set.clientId) && <PrBadge />}
         <button
@@ -244,7 +252,7 @@ function ActiveSetCard({ set, current }: { set: WorkoutSet; current: CurrentExer
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2.5">
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
           <p className="mb-1.5 text-center text-sm text-muted-foreground">{t("weightWithUnit", { unit: fmt.unitLabel })}</p>
           <WeightStepper
@@ -309,9 +317,9 @@ function AllDoneCard({ current }: { current: CurrentExercise }) {
         <button
           type="button"
           onClick={() => goTo(current.index + 1)}
-          className={cn(pill, "mt-3 h-12 w-full bg-primary text-primary-foreground")}
+          className={cn(pill, "mt-3 h-auto min-h-12 w-full bg-primary py-2 text-primary-foreground")}
         >
-          <span className="truncate">{t("nextNamed", { name: exerciseName(next, locale) })}</span>
+          <span className="line-clamp-2 min-w-0 leading-tight break-words">{t("nextNamed", { name: exerciseName(next, locale) })}</span>
           <ArrowRight className="size-4 shrink-0" aria-hidden />
         </button>
       ) : (

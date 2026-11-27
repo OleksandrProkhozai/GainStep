@@ -53,7 +53,7 @@ export function ActiveWorkoutBanner({
           </span>
           {t("inProgress")}
         </p>
-        <h2 className="mt-1.5 truncate font-heading text-xl font-extrabold md:text-2xl">{workout.name}</h2>
+        <h2 className="mt-1.5 line-clamp-2 font-heading text-xl leading-tight font-extrabold md:text-2xl">{workout.name}</h2>
         <p className="mt-0.5 text-sm text-muted-foreground" suppressHydrationWarning>
           {minutes < 1
             ? t("startedJustNow")

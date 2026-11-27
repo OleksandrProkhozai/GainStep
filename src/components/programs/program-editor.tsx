@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useReducer, useState, useTransition } from "react";
+import { useEffect, useMemo, useReducer, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   closestCenter,
@@ -13,12 +13,22 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { ChevronLeft, Copy, Info, Loader2, Lock, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { ChevronLeft, Copy, Info, Loader2, Lock, MoreHorizontal, Pencil, Play, Plus, Star, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useErrorText } from "@/components/i18n/use-error-text";
 import { ExercisePicker } from "@/components/exercises/exercise-picker";
-import { useMinRest, useTransitionRestEnabled } from "@/components/preferences/preferences-provider";
+import { useMinRest, useTransitionRestEnabled, useUnit } from "@/components/preferences/preferences-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { LibraryExercise } from "@/lib/exercises/catalog";
 import { cloneTemplate, saveProgram } from "@/lib/programs/actions";
+import { OFFER_ACTIVATE_PARAM } from "@/lib/programs/active";
 import {
   buildSavePayload,
   dayStats,
@@ -37,7 +48,9 @@ import {
   nextDayName,
   type DraftExercise,
 } from "@/lib/programs/draft";
-import { nextChip } from "@/lib/programs/next";
+import { nextChip, nextInput } from "@/lib/programs/next";
+import { suggestNextWeight } from "@/lib/progression";
+import { explainSuggestion } from "@/lib/progression-explain";
 import { effectiveRest } from "@/lib/workout/rest";
 import type { ProgramEditorData } from "@/lib/programs/queries";
 import {
@@ -50,6 +63,7 @@ import {
 } from "@/lib/programs/schema";
 import { cn } from "@/lib/utils";
 import { StartWorkoutForm } from "@/components/workout/start-workout-form";
+import { useActivateProgramAction, useActiveProgram } from "./active-program";
 import { ExerciseRow } from "./exercise-row";
 import { ProgramThumb } from "./program-thumb";
 import { NameDialog } from "./name-dialog";
@@ -66,10 +80,16 @@ const newKey = (prefix: string) => `${prefix}-new-${Date.now().toString(36)}-${+
  * Редактор програми. Уся програма — локальна чернетка (useReducer);
  * збереження — одним server action (RPC save_program, одна транзакція).
  * Шаблон (owner_id = null) відкривається лише для перегляду.
+ * offerActivate — щойно створена програма, що не стала активною: після
+ * першого збереження — діалог «Зробити «…» активною?».
  */
-export function ProgramEditor({ data }: { data: ProgramEditorData }) {
+export function ProgramEditor({ data, offerActivate = false }: { data: ProgramEditorData; offerActivate?: boolean }) {
   const { program, library, history } = data;
+  // Одиниці й мова — для чипа Next (крок 5 lb) і пояснення "Чому така вага?".
+  const unit = useUnit();
+  const locale = useLocale();
   const t = useTranslations("programs.editor");
+  const ta = useTranslations("programs.active");
   const tc = useTranslations("common");
   const errorText = useErrorText();
   // Мінімальний відпочинок з Settings: лише при показі (чипи, ~хв) і для нових вправ.
@@ -85,6 +105,20 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
   const [renaming, setRenaming] = useState<null | "program" | "day">(null);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [saving, startSaving] = useTransition();
+  // Активна програма — зі спільного стану списку й редактора (оптимістично).
+  const { activeId, pending: activating, activate } = useActiveProgram();
+  const isActive = !readOnly && activeId === program.id;
+  const makeActive = () => activate({ id: program.id, name: draft.name });
+  const [offer, setOffer] = useState(offerActivate);
+  const [offerOpen, setOfferOpen] = useState(false);
+
+  // ?new=1 прибираємо з адреси одразу: оновлення сторінки не повторює пропозицію.
+  useEffect(() => {
+    if (!offerActivate) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(OFFER_ACTIVATE_PARAM);
+    window.history.replaceState(null, "", url);
+  }, [offerActivate]);
 
   // Після збереження сервер віддає нову версію (updated_at) — скидаємо чернетку
   // до збережених даних (у нових днів і вправ з'являються id).
@@ -149,8 +183,15 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
     }
     startSaving(async () => {
       const result = await saveProgram(program.id, parsed.data);
-      if (result.ok) toast.success(t("saved"));
-      else toast.error(errorText(result.error));
+      if (!result.ok) {
+        toast.error(errorText(result.error));
+        return;
+      }
+      toast.success(t("saved"));
+      if (offer) {
+        setOffer(false);
+        if (!isActive) setOfferOpen(true);
+      }
     });
   };
 
@@ -194,7 +235,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
                 isTemplate: false,
               }}
               size="md"
-              active={program.isActive}
+              active={isActive}
             />
             <span
               aria-hidden
@@ -205,10 +246,10 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             {readOnly && <Lock className="size-5 shrink-0 text-muted-foreground" aria-label={t("readOnly")} />}
-            <h1 className="min-w-0 truncate font-heading text-2xl leading-tight font-extrabold tracking-tight lg:text-[28px]">
+            <h1 className="line-clamp-2 min-w-0 font-heading text-2xl leading-tight [overflow-wrap:anywhere] font-extrabold tracking-tight lg:text-[28px]">
               {draft.name}
             </h1>
-            {program.isActive && (
+            {isActive && (
               <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
                 {t("active")}
               </span>
@@ -241,17 +282,24 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
               <Pencil aria-hidden />
               {t("rename")}
             </Button>
+            {!isActive && <MakeActiveButton onClick={makeActive} pending={activating} className="max-sm:hidden" />}
             <ProgramMenu
               programId={program.id}
               name={draft.name}
-              isActive={program.isActive}
+              isActive={isActive}
               dirty={dirty}
+              onSetActive={makeActive}
               onRename={() => setRenaming("program")}
               onChangePhoto={() => setPhotoOpen(true)}
             />
           </div>
         )}
       </header>
+
+      {/* Телефон: «Зробити активною» на всю ширину під назвою */}
+      {!readOnly && !isActive && (
+        <MakeActiveButton onClick={makeActive} pending={activating} className="mt-3 w-full sm:hidden" />
+      )}
 
       {readOnly && (
         <form action={cloneTemplate.bind(null, program.id)} className="mt-4">
@@ -360,7 +408,11 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
                   <ExerciseRow
                     key={e.key}
                     exercise={e}
-                    chip={nextChip(e, history)}
+                    chip={nextChip(e, history, unit)}
+                    why={(() => {
+                      const input = nextInput(e, history, unit);
+                      return explainSuggestion({ ...input, unit }, suggestNextWeight(input), locale);
+                    })()}
                     readOnly={readOnly}
                     expanded={expandedKey === e.key}
                     onToggle={() => setExpandedKey((k) => (k === e.key ? null : e.key))}
@@ -390,6 +442,7 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
             <StartDay
               dayId={day.id}
               dayName={day.name}
+              program={isActive ? null : { id: program.id, name: draft.name }}
               disabled={dirty || day.exercises.length === 0}
               hint={dirty ? t("saveFirst") : day.exercises.length === 0 ? t("addExercisesFirst") : null}
             />
@@ -464,6 +517,27 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
             }}
           />
           <UnsavedGuard dirty={dirty} />
+          <AlertDialog open={offerOpen} onOpenChange={setOfferOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{ta("offerTitle", { name: draft.name })}</AlertDialogTitle>
+                <AlertDialogDescription>{ta("offerText")}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className={buttonVariants({ variant: "outline-pill" })}>{ta("later")}</AlertDialogCancel>
+                <AlertDialogAction
+                  className={buttonVariants()}
+                  onClick={() => {
+                    setOfferOpen(false);
+                    makeActive();
+                  }}
+                >
+                  <Star aria-hidden />
+                  {ta("yes")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>
@@ -474,15 +548,20 @@ export function ProgramEditor({ data }: { data: ProgramEditorData }) {
 function StartDay({
   dayId,
   dayName,
+  program,
   disabled,
   hint,
 }: {
   dayId: string | null;
   dayName: string;
+  /** Неактивна програма — після старту пропонуємо зробити її активною. */
+  program: { id: string; name: string } | null;
   disabled: boolean;
   hint: string | null;
 }) {
   const t = useTranslations("programs.editor");
+  const ta = useTranslations("programs.active");
+  const activate = useActivateProgramAction();
   const label = t("startDay", { name: dayName });
   if (disabled || !dayId) {
     return (
@@ -498,7 +577,20 @@ function StartDay({
     );
   }
   return (
-    <StartWorkoutForm dayId={dayId} className="mt-4">
+    <StartWorkoutForm
+      dayId={dayId}
+      className="mt-4"
+      onStart={
+        program
+          ? () =>
+              // Toaster — у кореневому layout, тож toast лишається і на екрані тренування.
+              toast(ta("trainingOther", { name: program.name }), {
+                duration: 12_000,
+                action: { label: ta("yes"), onClick: () => void activate(program) },
+              })
+          : undefined
+      }
+    >
       <PendingButton size="lg" className="w-full">
         <Play className="size-4 fill-current" aria-hidden />
         {label}
@@ -535,5 +627,24 @@ function TemplateOverview({
         ))}
       </ul>
     </section>
+  );
+}
+
+/** Outline-pill «Зробити активною» у шапці редактора. */
+function MakeActiveButton({ onClick, pending, className }: { onClick: () => void; pending: boolean; className?: string }) {
+  const t = useTranslations("programs.active");
+  return (
+    <Button
+      type="button"
+      variant="outline-pill"
+      size="sm"
+      onClick={onClick}
+      disabled={pending}
+      aria-busy={pending}
+      className={className}
+    >
+      {pending && <Loader2 className="animate-spin" aria-hidden />}
+      {t("makeActive")}
+    </Button>
   );
 }

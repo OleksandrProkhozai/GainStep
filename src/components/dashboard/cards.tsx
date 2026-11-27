@@ -169,7 +169,7 @@ export function ProgressionCard({ items, unit }: { items: SmartSuggestion[]; uni
           <div className="mt-3">
             <p className="flex items-center gap-2.5 text-sm text-foreground/85">
               <ExerciseThumb exercise={{ muscleGroup: first.muscleGroup ?? "" }} size="sm" />
-              <span className="truncate">{first.name}</span>
+              <span className="line-clamp-2 min-w-0">{first.name}</span>
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="font-heading text-[28px] leading-none font-extrabold tracking-tight tabular-nums">
@@ -191,7 +191,7 @@ export function ProgressionCard({ items, unit }: { items: SmartSuggestion[]; uni
                 return (
                   <li key={item.exerciseId} className="flex items-center gap-2 py-2 text-sm">
                     <ExerciseThumb exercise={{ muscleGroup: item.muscleGroup ?? "" }} size="sm" className="size-7 rounded-xl" />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1">{item.name}</span>
                     <span className="shrink-0 font-semibold tabular-nums">
                       {fmt.weight(item.suggestion.weight ?? 0)}
                     </span>

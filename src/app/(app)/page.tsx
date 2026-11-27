@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { CalendarDays, Dumbbell, Flame, Trophy } from "lucide-react";
 import { ProgressionCard, StatCard, TodayCard } from "@/components/dashboard/cards";
 import { ProgressChart } from "@/components/dashboard/progress-chart";
+import { ActiveProgramProvider } from "@/components/programs/active-program";
+import { ChooseActiveProgram } from "@/components/programs/choose-active-program";
 import { OfflineQueueBanner } from "@/components/pwa/offline-banner";
 import { OfflineKitSync } from "@/components/pwa/offline-kit-sync";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -27,7 +29,7 @@ export default async function DashboardPage() {
   if (!user.onboarded) redirect("/onboarding");
   const [supabase, locale, t] = await Promise.all([createClient(), getLocale(), getTranslations("dashboard")]);
   const now = new Date();
-  const data = await getDashboardData(supabase, user.id, now, locale);
+  const data = await getDashboardData(supabase, user.id, now, locale, user.unit);
   const todayFormat = dateFormat(locale, { weekday: "long", day: "numeric", month: "long" });
 
   const firstName =
@@ -58,10 +60,17 @@ export default async function DashboardPage() {
       </header>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px] md:gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <TodayCard
-          day={data.program ? data.today : null}
-          activeWorkout={data.activeWorkout}
-        />
+        {/* Активної програми немає (наприклад, видалили), а власні є — обрати; шаблон не підставляємо */}
+        {!data.program && !data.activeWorkout && data.myPrograms.length > 0 ? (
+          <ActiveProgramProvider activeId={null}>
+            <ChooseActiveProgram programs={data.myPrograms} />
+          </ActiveProgramProvider>
+        ) : (
+          <TodayCard
+            day={data.program ? data.today : null}
+            activeWorkout={data.activeWorkout}
+          />
+        )}
         <ProgressionCard items={data.program ? data.smartProgression : []} unit={unit} />
       </div>
 

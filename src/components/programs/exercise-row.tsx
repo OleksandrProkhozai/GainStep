@@ -4,6 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Lock, Minus, Plus, Trash2 } from "lucide-react";
 import { ExerciseThumb } from "@/components/exercises/exercise-thumb";
+import { WhyWeight } from "@/components/progression/why-weight";
 import { useLocale, useTranslations } from "next-intl";
 import { useWeightFormat } from "@/components/i18n/use-format";
 import { useMinRest } from "@/components/preferences/preferences-provider";
@@ -155,6 +156,7 @@ type Patch = Partial<Pick<DraftExercise, "targetSets" | "repMin" | "repMax" | "r
 export function ExerciseRow({
   exercise,
   chip,
+  why,
   expanded,
   readOnly,
   onToggle,
@@ -163,6 +165,8 @@ export function ExerciseRow({
 }: {
   exercise: DraftExercise;
   chip: NextChipData;
+  /** Пояснення "Чому така вага?" для чипа Next. */
+  why: string;
   expanded: boolean;
   readOnly: boolean;
   onToggle: () => void;
@@ -230,9 +234,13 @@ export function ExerciseRow({
       )}
     >
       {readOnly ? (
-        <div className={cn(bodyGrid, "px-4 py-3")}>{body}</div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 py-3 pr-2 pl-4">
+          <div className={bodyGrid}>{body}</div>
+          {/* "i" поза кнопкою рядка: кнопку в кнопку вкладати не можна. На телефоні чип — другим рядком. */}
+          <WhyWeight text={why} className="max-sm:self-end" />
+        </div>
       ) : (
-        <div className="grid grid-cols-[20px_minmax(0,1fr)] items-center gap-3 px-4 py-3">
+        <div className="grid grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-x-3 py-3 pr-2 pl-4">
           <button
             type="button"
             ref={setActivatorNodeRef}
@@ -260,6 +268,7 @@ export function ExerciseRow({
           >
             {body}
           </button>
+          <WhyWeight text={why} className="-ml-2 max-sm:self-end" />
         </div>
       )}
 

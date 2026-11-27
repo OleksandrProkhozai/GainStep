@@ -21,7 +21,7 @@ export function DayCard({ day, blocked }: { day: HubDay; blocked: boolean }) {
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 truncate font-heading text-xl font-extrabold">{day.name}</h3>
+        <h3 className="line-clamp-2 min-w-0 font-heading text-xl leading-tight font-extrabold [overflow-wrap:anywhere]">{day.name}</h3>
         {day.isNext && (
           <span className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold tracking-wide text-primary-foreground uppercase">
             {t("upNext")}
@@ -33,7 +33,7 @@ export function DayCard({ day, blocked }: { day: HubDay; blocked: boolean }) {
       </p>
       <ul className="mt-2 mb-5 space-y-0.5 text-sm text-muted-foreground">
         {day.preview.map((name, i) => (
-          <li key={`${name}-${i}`} className="truncate">
+          <li key={`${name}-${i}`} className="line-clamp-2">
             {name}
           </li>
         ))}

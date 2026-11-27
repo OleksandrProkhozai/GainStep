@@ -89,7 +89,7 @@ export function RecentWorkouts({ workouts, unit }: { workouts: HubRecent[]; unit
                 {/* Телефон: два рядки */}
                 <div className="flex items-center gap-3 py-3.5 pr-1 pl-4 md:hidden">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold">{w.name}</p>
+                    <p className="line-clamp-2 leading-snug font-semibold">{w.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {date} · {duration}
                     </p>

@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DELOAD_MIN_FAILED_SETS,
+  DELOAD_REP_SHORTFALL,
+  DELOAD_SESSIONS,
   detectPRs,
+  failedSetsNeeded,
+  failRepsThreshold,
   historyBest,
+  isFailedSession,
   isPR,
   markPRs,
   suggestNextWeight,
@@ -56,11 +62,17 @@ describe("suggestNextWeight — none", () => {
     });
   });
 
-  it("в останньому тренуванні немає виконаних підходів", () => {
+  it("тренування, де вправу пропустили (лише невиконані підходи), ігнорується — береться попереднє", () => {
     const history: Session[] = [
       { sets: [skipped(60, 12), skipped(60, 12)] },
       session(60, 12, 12, 12),
     ];
+    expect(suggest(history).action).toBe("increase");
+    expect(suggest(history).weight).toBe(62.5);
+  });
+
+  it("лише тренування без виконаних підходів → none", () => {
+    const history: Session[] = [{ sets: [skipped(60, 12), skipped(60, 12)] }];
     expect(suggest(history).action).toBe("none");
     expect(suggest(history).weight).toBeNull();
   });
@@ -137,19 +149,83 @@ describe("suggestNextWeight — same", () => {
   });
 });
 
+describe("правило розвантаження — константи й невдале тренування", () => {
+  it("константи: недобір 2, мінімум 2 підходи, 2 тренування поспіль", () => {
+    expect(DELOAD_REP_SHORTFALL).toBe(2);
+    expect(DELOAD_MIN_FAILED_SETS).toBe(2);
+    expect(DELOAD_SESSIONS).toBe(2);
+    expect(failRepsThreshold(8)).toBe(6);
+  });
+
+  it("min(2, targetSets): 1 підхід → 1, 2 → 2, 5 → 2", () => {
+    expect(failedSetsNeeded(1)).toBe(1);
+    expect(failedSetsNeeded(2)).toBe(2);
+    expect(failedSetsNeeded(5)).toBe(2);
+  });
+
+  it("isFailedSession при 8–12 × 3", () => {
+    expect(isFailedSession(session(60, 7, 6, 6), 8, 3)).toBe(true);
+    expect(isFailedSession(session(60, 6, 6, 8), 8, 3)).toBe(true);
+    expect(isFailedSession(session(60, 6, 9, 10), 8, 3)).toBe(false); // лише один підхід ≤ 6
+    expect(isFailedSession(session(60, 8, 8, 7), 8, 3)).toBe(false); // недобір 1
+    expect(isFailedSession(session(60, 7, 7, 7), 8, 3)).toBe(false); // рівно repMin − 1
+    expect(isFailedSession(session(60, 6, 6, 12), 8, 3)).toBe(true); // рівно repMin − 2
+    expect(isFailedSession(undefined, 8, 3)).toBe(false);
+  });
+
+  it("рахуються лише робочі підходи: легші розминкові з малими reps не провалюють", () => {
+    const s: Session = { sets: [done(40, 5), done(40, 5), done(60, 9), done(60, 8), done(60, 8)] };
+    expect(isFailedSession(s, 8, 3)).toBe(false);
+  });
+
+  it("невиконані підходи не рахуються", () => {
+    const s: Session = { sets: [done(60, 9), skipped(60, 3), skipped(60, 2)] };
+    expect(isFailedSession(s, 8, 3)).toBe(false);
+  });
+});
+
 describe("suggestNextWeight — deload", () => {
-  it("два тренування поспіль з підходом < repMin → 57.5 з 62.5", () => {
-    const history = [session(62.5, 9, 7, 6), session(62.5, 10, 8, 7)];
+  it("два невдалі тренування поспіль → 57.5 з 62.5", () => {
+    const history = [session(62.5, 7, 6, 6), session(62.5, 6, 6, 8)];
     expect(suggest(history)).toEqual({
       action: "deload",
       weight: 57.5,
       delta: -5,
-      reason: "Below 8 reps two sessions in a row — deload −10%",
+      reason: "2 failed sessions in a row (≤ 6 reps) — deload −10%",
     });
   });
 
-  it("лише одне таке тренування → same", () => {
-    const history = [session(62.5, 9, 7, 6), session(62.5, 10, 9, 8)];
+  it("старе правило: по одному підходу < repMin двічі поспіль — тепер same", () => {
+    // 9/7/6 і 10/8/7: у кожному лише один підхід ≤ 6 → не невдалі тренування.
+    const history = [session(62.5, 9, 7, 6), session(62.5, 10, 8, 7)];
+    expect(suggest(history)).toMatchObject({ action: "same", weight: 62.5 });
+  });
+
+  it("недобір 1 повторення двічі поспіль → same (7/7/7, 7/7/7)", () => {
+    expect(suggest([session(62.5, 7, 7, 7), session(62.5, 7, 7, 7)]).action).toBe("same");
+  });
+
+  it("межа: рівно repMin − 2 у двох підходах двічі → deload", () => {
+    expect(suggest([session(60, 6, 6, 12), session(60, 12, 6, 6)]).action).toBe("deload");
+  });
+
+  it("межа: рівно repMin − 1 у всіх підходах двічі → same", () => {
+    expect(suggest([session(60, 7, 7, 7), session(60, 7, 7, 7)]).action).toBe("same");
+  });
+
+  it("1 цільовий підхід: один підхід ≤ repMin − 2 двічі → deload", () => {
+    const s = suggest([session(60, 6), session(60, 5)], { targetSets: 1 });
+    expect(s.action).toBe("deload");
+    expect(s.weight).toBe(55); // 0.9 × 60 = 54 → 55 (крок 2.5)
+  });
+
+  it("2 цільові підходи: потрібні обидва з сильним недобором", () => {
+    expect(suggest([session(60, 6, 6), session(60, 6, 6)], { targetSets: 2 }).action).toBe("deload");
+    expect(suggest([session(60, 6, 8), session(60, 6, 6)], { targetSets: 2 }).action).toBe("same");
+  });
+
+  it("лише одне невдале тренування → same", () => {
+    const history = [session(62.5, 7, 6, 6), session(62.5, 10, 9, 8)];
     expect(suggest(history).action).toBe("same");
   });
 
@@ -196,13 +272,13 @@ describe("suggestNextWeight — deload", () => {
 describe("suggestNextWeight — пріоритет", () => {
   it("increase має пріоритет над deload", () => {
     // За коректного діапазону (repMin ≤ repMax) умови взаємовиключні:
-    // якщо всі робочі підходи ≥ repMax, то жоден не < repMin.
-    // Колізія можлива лише при помилковому налаштуванні repMin > repMax —
-    // саме його й моделюємо: repMin = 13, repMax = 12. Тоді обидва
-    // тренування мають підходи < repMin (умова deload), а останнє — усі
+    // якщо всі робочі підходи ≥ repMax, то жоден не ≤ repMin − 2.
+    // Колізія можлива лише при помилковому налаштуванні repMin > repMax + 1 —
+    // саме його й моделюємо: repMin = 14, repMax = 12. Тоді обидва
+    // тренування невдалі (≥ 2 підходи ≤ 12, умова deload), а останнє — усі
     // підходи ≥ repMax (умова increase). Має перемогти increase.
     const history = [session(60, 12, 12, 12), session(60, 5, 5, 5)];
-    const s = suggest(history, { repMin: 13, repMax: 12 });
+    const s = suggest(history, { repMin: 14, repMax: 12 });
     expect(s.action).toBe("increase");
     expect(s.weight).toBe(62.5);
   });

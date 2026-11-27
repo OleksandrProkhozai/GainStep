@@ -3,34 +3,37 @@
  * подвійної прогресії (suggestNextWeight) з параметрами рядка й історією вправи.
  */
 
-import { suggestNextWeight, type Session, type SuggestionAction } from "@/lib/progression";
+import {
+  DELOAD_SESSIONS,
+  isPureBodyweight,
+  suggestNextWeight,
+  withCompletedSets,
+  type ProgressionInput,
+  type Session,
+  type SuggestionAction,
+} from "@/lib/progression";
+import { progressionIncrementKg, type WeightUnit } from "@/lib/units";
 import type { DraftExercise } from "./draft";
 
-/** Останні тренування кожної вправи (від найновішого) — досить двох. */
+export { isPureBodyweight };
+
+/** Останні тренування кожної вправи (від найновішого) — досить DELOAD_SESSIONS. */
 export type RecentHistory = Record<string, Session[]>;
 
-/** Скільки останніх тренувань вправи потрібно алгоритму. */
-export const NEXT_HISTORY_SESSIONS = 2;
+/** Скільки останніх тренувань вправи потрібно алгоритму (правило розвантаження). */
+export const NEXT_HISTORY_SESSIONS = DELOAD_SESSIONS;
 
-/** Map вправа → тренування (від найновішого) → об'єкт для передачі на клієнт. */
+/**
+ * Map вправа → тренування (від найновішого) → об'єкт для передачі на клієнт.
+ * Тренування, де вправу пропустили (без виконаних підходів), відкидаються ДО
+ * обрізання до двох — інакше пропуск "з'їдав" би реальне тренування.
+ */
 export function toRecentHistory(sessions: Map<string, readonly Session[]>): RecentHistory {
   const result: RecentHistory = {};
   for (const [exerciseId, list] of sessions) {
-    result[exerciseId] = list.slice(0, NEXT_HISTORY_SESSIONS).map((s) => ({ sets: s.sets }));
+    result[exerciseId] = withCompletedSets(list).slice(0, NEXT_HISTORY_SESSIONS);
   }
   return result;
-}
-
-/**
- * Вправа без ваги: equipment = bodyweight і в історії немає виконаних
- * підходів з вагою > 0. Зважені варіанти (віджимання з поясом) — звичайна
- * прогресія. Невиконані підходи не рахуються: їхня вага — лише підставлене
- * значення, а не піднята вага (так само їх ігнорує suggestNextWeight).
- */
-export function isPureBodyweight(equipment: string, sessions: readonly Session[] = []): boolean {
-  return (
-    equipment === "bodyweight" && !sessions.some((s) => s.sets.some((set) => set.isCompleted && set.weight > 0))
-  );
 }
 
 /**
@@ -47,22 +50,35 @@ export interface NextChip {
   repMax: number;
 }
 
-export function nextChip(
-  row: Pick<DraftExercise, "exerciseId" | "equipment" | "targetSets" | "repMin" | "repMax" | "incrementKg">,
-  history: RecentHistory,
-): NextChip {
-  const sessions = history[row.exerciseId] ?? [];
-  if (isPureBodyweight(row.equipment, sessions)) {
-    return { action: "bodyweight", weightKg: null, repMax: row.repMax };
-  }
-  const s = suggestNextWeight({
-    history: sessions,
+type ChipRow = Pick<DraftExercise, "exerciseId" | "equipment" | "targetSets" | "repMin" | "repMax" | "incrementKg">;
+
+/**
+ * Вхід алгоритму для рядка програми: діапазон і підходи — з цього рядка
+ * (поточна програма), крок — exercises.weight_increment (lb → 5 / 2.5 lb),
+ * історія — по вправі з усіх тренувань. Той самий вхід — для пояснення.
+ */
+export function nextInput(row: ChipRow, history: RecentHistory, unit: WeightUnit = "kg"): ProgressionInput {
+  return {
+    history: history[row.exerciseId] ?? [],
     repMin: row.repMin,
     repMax: row.repMax,
     targetSets: row.targetSets,
-    increment: row.incrementKg,
+    increment: progressionIncrementKg(row.incrementKg, unit),
     equipment: row.equipment,
-  });
+  };
+}
+
+export function nextChip(
+  row: ChipRow,
+  history: RecentHistory,
+  /** Одиниці користувача: для lb крок прогресії — 5 / 2.5 lb. */
+  unit: WeightUnit = "kg",
+): NextChip {
+  const input = nextInput(row, history, unit);
+  if (isPureBodyweight(row.equipment, input.history)) {
+    return { action: "bodyweight", weightKg: null, repMax: row.repMax };
+  }
+  const s = suggestNextWeight(input);
   if (s.action === "none" || s.weight === null) {
     return { action: "none", weightKg: null, repMax: row.repMax };
   }

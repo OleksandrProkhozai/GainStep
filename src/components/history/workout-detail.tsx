@@ -42,8 +42,8 @@ export function WorkoutDetail({ workout, unit }: { workout: HistoryWorkout; unit
           <ArrowLeft className="size-5" aria-hidden />
         </Link>
         <div className="min-w-0 flex-1 max-md:text-center">
-          <h1 className="flex items-center gap-2 font-heading text-xl leading-tight font-extrabold tracking-tight max-md:justify-center md:text-[28px]">
-            <span className="truncate">{workout.name}</span>
+          <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-heading text-xl leading-tight font-extrabold tracking-tight max-md:justify-center md:text-[28px]">
+            <span className="line-clamp-2 min-w-0">{workout.name}</span>
             {workout.deload && <DeloadBadge />}
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground md:text-sm">
@@ -93,7 +93,7 @@ export function WorkoutDetail({ workout, unit }: { workout: HistoryWorkout; unit
               <div className="mb-1.5 flex items-center gap-3">
                 <ExerciseThumb exercise={ex} size="md" />
                 <div className="min-w-0">
-                  <h2 className="truncate text-[15px] font-semibold">{name}</h2>
+                  <h2 className="line-clamp-2 text-[15px] leading-snug font-semibold">{name}</h2>
                   <p className="text-xs text-muted-foreground tabular-nums">
                     {t("setsSummary", { count: done.length })}
                     {top !== null && ` · ${fmt.weight(top)}`}

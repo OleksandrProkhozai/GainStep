@@ -20,6 +20,7 @@ import {
   type AddPlacement,
 } from "./plan";
 import type { WorkoutExercise, WorkoutInit, WorkoutSet } from "./types";
+import type { WeightUnit } from "@/lib/units";
 
 /**
  * Ключ складу тренування (workouts.exercise_plan) у черзі синхронізації.
@@ -233,7 +234,11 @@ export function removePersistedWorkout(workoutId: string) {
  * skipHydration: стан із localStorage підтягується вручну після монтування,
  * щоб серверний HTML не розходився з клієнтським.
  */
-export function createWorkoutStore(init: WorkoutInit) {
+/**
+ * @param unit одиниці користувача — крок підказки ваги для нових підходів
+ *   (lb: 5 lb замість 2.5 кг). Без нього — кг.
+ */
+export function createWorkoutStore(init: WorkoutInit, unit: WeightUnit = "kg") {
   return createStore<WorkoutState & WorkoutActions>()(
     persist(
       (set, get) => {
@@ -263,7 +268,7 @@ export function createWorkoutStore(init: WorkoutInit) {
           created: init.created ?? true,
           programDayId: init.programDayId ?? null,
           exercises: init.exercises,
-          sets: buildSets(init.exercises, init.savedSets),
+          sets: buildSets(init.exercises, init.savedSets, undefined, unit),
           currentIndex: 0,
           expandedSetId: null,
           rest: IDLE_REST,
@@ -323,7 +328,7 @@ export function createWorkoutStore(init: WorkoutInit) {
           addSet: (exerciseId) => {
             const exercise = get().exercises.find((e) => e.exerciseId === exerciseId);
             if (!exercise) return;
-            set((s) => ({ sets: appendSet(s.sets, exercise) }));
+            set((s) => ({ sets: appendSet(s.sets, exercise, undefined, unit) }));
           },
 
           deleteSet: (clientId) => {
@@ -343,7 +348,7 @@ export function createWorkoutStore(init: WorkoutInit) {
             const s = get();
             const result = insertExercises(s.exercises, items, s.currentIndex, placement);
             if (result.added.length === 0) return [];
-            const sets = [...s.sets, ...result.added.flatMap((e) => initialSets(e))];
+            const sets = [...s.sets, ...result.added.flatMap((e) => initialSets(e, undefined, unit))];
             set({
               exercises: result.list,
               sets,

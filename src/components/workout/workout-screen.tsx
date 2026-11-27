@@ -43,7 +43,9 @@ const UNDO_MS = 5_000;
  * завершень — замість екрана показується локальний підсумок.
  */
 export function WorkoutScreen({ init }: { init: WorkoutInit }) {
-  const [store] = useState(() => createWorkoutStore(init));
+  // Одиниці — для кроку підказки ваги нових підходів (lb: 5 lb).
+  const unit = useUnit();
+  const [store] = useState(() => createWorkoutStore(init, unit));
   const [hydrated, setHydrated] = useState(false);
   const finishTask = useOffline((s) => s.finishes.find((f) => f.workoutId === init.workoutId) ?? null);
 

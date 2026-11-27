@@ -17,10 +17,13 @@ import { createWorkoutStore, readPersistedWorkout } from "@/lib/workout/store";
 export function StartWorkoutForm({
   dayId,
   className,
+  onStart,
   children,
 }: {
   dayId: string;
   className?: string;
+  /** Старт нового тренування через server action — наприклад, toast «Зробити активною?» (офлайн-старт можливий лише з активної програми). */
+  onStart?: () => void;
   children: ReactNode;
 }) {
   const t = useTranslations("offline");
@@ -33,7 +36,10 @@ export function StartWorkoutForm({
       ? readPersistedWorkout(active.workoutId)
       : null;
     const continueLocal = local !== null && (local.created === false || !navigator.onLine);
-    if (navigator.onLine && !continueLocal) return; // звичайний старт через server action
+    if (navigator.onLine && !continueLocal) {
+      onStart?.();
+      return; // звичайний старт через server action
+    }
 
     event.preventDefault();
     if (continueLocal) {
@@ -49,7 +55,7 @@ export function StartWorkoutForm({
     }
     // Зберігаємо стан у localStorage (setState записує persist) і відкриваємо
     // екран: service worker віддасть офлайн-сторінку, а вона збудує його зі стору.
-    createWorkoutStore(init).setState({});
+    createWorkoutStore(init, offlineStore.getState().preferences?.unit ?? "kg").setState({});
     offlineStore.getState().setActive({ workoutId: init.workoutId, name: init.name });
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- без мережі потрібна документна навігація: сторінку віддає service worker
     window.location.assign(`/workout/${init.workoutId}`);

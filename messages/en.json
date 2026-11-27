@@ -25,9 +25,12 @@
       "reason": {
         "increase": "All sets reached {repMax} reps",
         "same": "Reach {repMax} reps on all sets first",
-        "deload": "Below {repMin} reps two sessions in a row",
-        "none": "No history yet — pick a starting weight"
-      }
+        "deload": "Well short of {repMin} reps two sessions in a row",
+        "none": "No history yet — pick a starting weight",
+        "bodyweight": "Build up to {repMax} reps on all sets"
+      },
+      "why": "Why this weight?",
+      "bodyweight": "Bodyweight"
     },
     "enums": {
       "muscle": {
@@ -727,7 +730,6 @@
     "menu": {
       "label": "Program actions",
       "setActive": "Set as active",
-      "activated": "Program is now active",
       "rename": "Rename",
       "duplicate": "Duplicate",
       "duplicatingSaved": "Duplicating the last saved version",
@@ -764,6 +766,22 @@
       "dialogTitle": "Program photo",
       "dialogDescription": "Shown in the program list and editor. Without a photo — the default image.",
       "saved": "Photo saved"
+    },
+    "active": {
+      "makeActive": "Make active",
+      "makeActiveNamed": "Make “{name}” active",
+      "activated": "“{name}” is now active",
+      "offerTitle": "Make “{name}” active?",
+      "offerText": "The active program’s days appear on the dashboard and in Workouts → Today.",
+      "yes": "Yes",
+      "later": "Later",
+      "trainingOther": "You’re training with “{name}”. Make it active?",
+      "chooseTitle": "Choose your active program",
+      "chooseText": "Its days will appear on the dashboard and in Workouts → Today.",
+      "manage": "Manage programs",
+      "myPrograms": "My programs",
+      "switchLabel": "Active program: {name}. Change",
+      "cardActions": "Actions for “{name}”"
     }
   },
   "exercises": {

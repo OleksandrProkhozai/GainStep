@@ -53,7 +53,7 @@ export function PlanChangesCard({
               <Plus className="size-3.5" strokeWidth={3} aria-hidden />
             </span>
             <span className="sr-only">{t("addedSr")}</span>
-            <span className="min-w-0 truncate font-medium">{name}</span>
+            <span className="line-clamp-2 min-w-0 font-medium">{name}</span>
           </li>
         ))}
         {changes.removed.map((name, i) => (
@@ -62,7 +62,7 @@ export function PlanChangesCard({
               <Minus className="size-3.5" strokeWidth={3} aria-hidden />
             </span>
             <span className="sr-only">{t("removedSr")}</span>
-            <span className="min-w-0 truncate text-muted-foreground line-through">{name}</span>
+            <span className="line-clamp-2 min-w-0 text-muted-foreground line-through">{name}</span>
           </li>
         ))}
       </ul>
@@ -79,11 +79,11 @@ export function PlanChangesCard({
           aria-busy={pending}
           className={cn(
             pill,
-            "mt-4 h-11 w-full border border-foreground/25 px-4 text-sm hover:bg-foreground/5 disabled:opacity-60",
+            "mt-4 h-auto min-h-11 w-full border border-foreground/25 px-4 py-2 text-sm hover:bg-foreground/5 disabled:opacity-60",
           )}
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          <span className="truncate">{t("apply", { day: changes.dayName })}</span>
+          <span className="line-clamp-2 min-w-0 leading-tight">{t("apply", { day: changes.dayName })}</span>
         </button>
       )}
     </Card>

@@ -44,8 +44,8 @@ export function LocalSummary({
   const synced = useOffline((s) => s.lastSynced === task.workoutId);
 
   const summary = useMemo(
-    () => buildLocalSummary({ exercises, sets }, startedAt, task.finishedAt, (e) => exerciseName(e, locale)),
-    [exercises, sets, startedAt, task.finishedAt, locale],
+    () => buildLocalSummary({ exercises, sets }, startedAt, task.finishedAt, (e) => exerciseName(e, locale), unit),
+    [exercises, sets, startedAt, task.finishedAt, locale, unit],
   );
 
   useEffect(() => {

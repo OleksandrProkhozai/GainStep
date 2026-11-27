@@ -126,10 +126,10 @@ function ExercisePanel() {
       <div role="table" aria-label={t("sets")} className="mt-6">
         <div
           role="row"
-          className="grid grid-cols-[24px_56px_minmax(0,1fr)_minmax(0,1fr)_80px] items-center gap-2 px-3 pb-2 text-sm text-muted-foreground xl:grid-cols-[44px_80px_minmax(0,1fr)_minmax(0,1fr)_96px]"
+          className="grid grid-cols-[20px_88px_minmax(0,1fr)_minmax(0,1fr)_80px] items-center gap-2 px-3 pb-2 text-sm text-muted-foreground xl:grid-cols-[32px_104px_minmax(0,1fr)_minmax(0,1fr)_96px]"
         >
           <span role="columnheader">{t("col.set")}</span>
-          <span role="columnheader">{t("col.previous")}</span>
+          <span role="columnheader" className="leading-tight">{t("col.previous")}</span>
           <span role="columnheader" className="text-center">
             {t("col.weight")}
           </span>
@@ -146,7 +146,7 @@ function ExercisePanel() {
               role="row"
               key={set.clientId}
               className={cn(
-                "group grid grid-cols-[24px_56px_minmax(0,1fr)_minmax(0,1fr)_80px] items-center gap-2 rounded-xl px-3 py-2.5 transition-colors xl:grid-cols-[44px_80px_minmax(0,1fr)_minmax(0,1fr)_96px]",
+                "group grid grid-cols-[20px_88px_minmax(0,1fr)_minmax(0,1fr)_80px] items-center gap-2 rounded-xl px-3 py-2.5 transition-colors xl:grid-cols-[32px_104px_minmax(0,1fr)_minmax(0,1fr)_96px]",
                 set.isCompleted ? "bg-primary/13" : "bg-foreground/3.5",
                 !set.isCompleted && set.clientId === activeSet?.clientId && "ring-1 ring-foreground/15",
               )}

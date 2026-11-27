@@ -75,7 +75,7 @@ describe("initialSets", () => {
 
   it("deload: повторення = rep_min", () => {
     const sets = initialSets(
-      exercise({ history: [session(62.5, 9, 7, 6), session(62.5, 10, 8, 7)] }),
+      exercise({ history: [session(62.5, 7, 6, 6), session(62.5, 6, 6, 8)] }),
       id,
     );
     expect(sets[0]).toMatchObject({ weightKg: 57.5, reps: 8 });

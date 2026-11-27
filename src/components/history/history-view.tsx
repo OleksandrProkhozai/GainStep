@@ -189,7 +189,7 @@ function RecordsCard({ data, unit, className }: { data: HistoryPageData; unit: W
                   <Trophy className="size-3.5" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium">{exerciseName(r, locale)}</span>
+                  <span className="line-clamp-2 text-[13px] leading-snug font-medium">{exerciseName(r, locale)}</span>
                   <span className="block text-xs text-muted-foreground">{shortDate(toDayKey(r.startedAt), locale)}</span>
                 </span>
                 <span className="shrink-0 text-[13px] text-muted-foreground tabular-nums">

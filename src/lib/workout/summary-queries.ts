@@ -58,6 +58,8 @@ export async function loadWorkoutSummary(
   userId: string,
   /** Мова назв системних вправ і шаблонів (name_uk). */
   locale = "en",
+  /** Одиниці користувача — крок "Наступного разу" (lb: 5 lb). */
+  unit: WeightUnit = "kg",
 ): Promise<LoadSummaryResult> {
   const [workoutRes, setsRes, templateNames] = await Promise.all([
     supabase
@@ -167,6 +169,7 @@ export async function loadWorkoutSummary(
   }
 
   const summary = buildWorkoutSummary({
+    unit,
     startedAt: workout.started_at,
     finishedAt: workout.finished_at,
     exercises: exercises.map((e) => {

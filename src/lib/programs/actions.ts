@@ -7,6 +7,7 @@ import { getRequestLocale } from "@/i18n/locale";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "@/lib/validations/zod-codes";
 import { isOwnImagePath, newImagePath } from "@/lib/images/storage";
+import { activateIfNone, newProgramPath } from "./active";
 import { PROGRAM_IMAGES_BUCKET } from "./images";
 import { firstIssue, programNameSchema, saveProgramSchema } from "./schema";
 
@@ -23,10 +24,16 @@ async function requireUser() {
   return { supabase, userId };
 }
 
-/** Сторінки, що показують програми: список, редактор, дашборд, хаб тренувань. */
-function revalidatePrograms(programId?: string) {
+/**
+ * Сторінки, що показують програми: список, редактор, дашборд, хаб тренувань.
+ * У проєкті немає `use cache` / cacheTag — сторінки динамічні, тегів немає;
+ * revalidatePath з server action оновлює поточний екран і скидає клієнтський
+ * кеш роутера. Редактор — шаблоном "/programs/[id]": бейдж «Активна»
+ * змінюється і в редакторі попередньої активної програми.
+ */
+function revalidatePrograms() {
   revalidatePath("/programs");
-  if (programId) revalidatePath(`/programs/${programId}`);
+  revalidatePath("/programs/[id]", "page");
   revalidatePath("/");
   revalidatePath("/workouts");
 }
@@ -68,22 +75,8 @@ export async function setProgramImage(programId: string, imagePath: string | nul
   }
   if (previous.image_path !== imagePath) await removeProgramImage(supabase, previous.image_path);
 
-  revalidatePrograms(programId);
+  revalidatePrograms();
   return { ok: true };
-}
-
-/** Робить програму активною, якщо в користувача активної ще немає. */
-async function activateIfNone(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  programId: string,
-) {
-  const { error } = await supabase
-    .from("profiles")
-    .update({ active_program_id: programId })
-    .eq("id", userId)
-    .is("active_program_id", null);
-  if (error) console.error("activateIfNone", error);
 }
 
 /**
@@ -112,10 +105,11 @@ export async function cloneTemplate(templateId: string, _formData?: FormData) {
     console.error("cloneTemplate", error);
     throw new Error("cloneTemplate failed");
   }
-  await activateIfNone(supabase, userId, newId);
+  const activated = await activateIfNone(supabase, userId, newId);
 
-  revalidatePrograms(newId);
-  redirect(`/programs/${newId}`);
+  revalidatePrograms();
+  // Не стала активною → редактор після першого збереження запропонує це зробити.
+  redirect(newProgramPath(newId, activated));
 }
 
 /** «+ New program»: програма з одним днем «Day 1». */
@@ -143,8 +137,11 @@ export async function createProgram(name: string): Promise<{ ok: false; error: s
     return { ok: false, error: "programCreateFailed" };
   }
 
-  revalidatePrograms(program.id);
-  redirect(`/programs/${program.id}`);
+  // Перша власна програма стає активною сама; інакше — пропозиція в редакторі.
+  const activated = await activateIfNone(supabase, userId, program.id);
+
+  revalidatePrograms();
+  redirect(newProgramPath(program.id, activated));
 }
 
 /**
@@ -177,10 +174,14 @@ export async function saveProgram(programId: string, payload: unknown): Promise<
     return { ok: false, error: "programSaveFailed" };
   }
 
-  revalidatePrograms(programId);
+  revalidatePrograms();
   return { ok: true };
 }
 
+/**
+ * Активна програма (дашборд, Тренування → Сьогодні, офлайн-кеш). Лише
+ * власна програма — шаблон спершу копіюється («Використати»).
+ */
 export async function setActiveProgram(programId: string): Promise<ProgramActionResult> {
   const { supabase, userId } = await requireUser();
   if (!idSchema.safeParse(programId).success) return { ok: false, error: "programNotFound" };
@@ -199,7 +200,7 @@ export async function setActiveProgram(programId: string): Promise<ProgramAction
     console.error("setActiveProgram", error);
     return { ok: false, error: "activeProgramFailed" };
   }
-  revalidatePrograms(programId);
+  revalidatePrograms();
   return { ok: true };
 }
 
@@ -236,7 +237,7 @@ export async function duplicateProgram(programId: string): Promise<{ ok: false; 
   }
   await supabase.from("programs").update({ name, image_path }).eq("id", newId);
 
-  revalidatePrograms(newId);
+  revalidatePrograms();
   redirect(`/programs/${newId}`);
 }
 

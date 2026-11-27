@@ -3,7 +3,9 @@ import { localizedName } from "@/lib/i18n/names";
 import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { addDays, startOfWeek, toDayKey } from "@/lib/dates";
 import { epley1RM, sessionVolume } from "@/lib/metrics";
-import { suggestNextWeight, type Suggestion } from "@/lib/progression";
+import { isPureBodyweight, suggestNextWeight, type Suggestion } from "@/lib/progression";
+import { progressionIncrementKg, type WeightUnit } from "@/lib/units";
+import { listMyPrograms } from "@/lib/programs/active";
 import { loadExerciseSessions } from "@/lib/workout/queries";
 import { countPRExercisesInWorkouts, type ExerciseSession } from "@/lib/workout/records";
 import type { Database } from "@/types/database.types";
@@ -29,7 +31,10 @@ export type SmartSuggestion = {
 };
 
 export type DashboardData = {
+  /** Активна програма; null — її немає (наприклад, видалили): шаблон не підставляємо. */
   program: { id: string; name: string } | null;
+  /** Власні програми — порожній стан «Виберіть активну програму». */
+  myPrograms: { id: string; name: string }[];
   today: { id: string; name: string } | null;
   /** Незавершене тренування (кнопка "Continue workout"). */
   activeWorkout: { id: string; name: string } | null;
@@ -59,8 +64,10 @@ export async function getDashboardData(
   now = new Date(),
   /** Мова назв системних вправ (name_uk). */
   locale = "en",
+  /** Одиниці користувача — крок прогресії (lb: 5 lb). */
+  unit: WeightUnit = "kg",
 ): Promise<DashboardData> {
-  const [profileRes, workoutsRes, activeRes, templateNames] = await Promise.all([
+  const [profileRes, workoutsRes, activeRes, templateNames, myPrograms] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -90,6 +97,7 @@ export async function getDashboardData(
       .limit(1)
       .maybeSingle(),
     getTemplateNames(supabase),
+    listMyPrograms(supabase, userId),
   ]);
   if (profileRes.error) throw profileRes.error;
   // Стандартні назви копій шаблонів і тренувань — мовою інтерфейсу.
@@ -150,6 +158,7 @@ export async function getDashboardData(
 
   return {
     program: program ? { id: program.id, name: tn(program.name) } : null,
+    myPrograms: myPrograms.map((p) => ({ id: p.id, name: tn(p.name) })),
     today: todayDay ? { id: todayDay.id, name: tn(todayDay.name) } : null,
     activeWorkout: activeRes.data ? { id: activeRes.data.id, name: tn(activeRes.data.name) } : null,
     week: {
@@ -169,6 +178,7 @@ export async function getDashboardData(
         equipment: pe.exercises?.equipment,
       })),
       weekData.sessions,
+      unit,
     ),
     streakWeeks,
     progress,
@@ -226,18 +236,22 @@ export function buildSmartProgression(
     equipment?: string;
   }[],
   sessions: Map<string, ExerciseSession[]>,
+  unit: WeightUnit = "kg",
 ): SmartSuggestion[] {
   const result: SmartSuggestion[] = [];
   const seen = new Set<string>();
   for (const ex of exercises) {
     if (seen.has(ex.exerciseId)) continue;
     seen.add(ex.exerciseId);
+    const history = sessions.get(ex.exerciseId) ?? [];
+    // Вправа з власною вагою — рекомендувати нічого (вага не змінюється).
+    if (isPureBodyweight(ex.equipment, history)) continue;
     const suggestion = suggestNextWeight({
-      history: sessions.get(ex.exerciseId) ?? [],
+      history,
       repMin: ex.repMin,
       repMax: ex.repMax,
       targetSets: ex.targetSets,
-      increment: ex.increment,
+      increment: progressionIncrementKg(ex.increment, unit),
       equipment: ex.equipment,
     });
     if (suggestion.action === "none") continue;

@@ -68,8 +68,8 @@ function CardSummary({ workout, compact }: { workout: HistoryWorkout; compact?: 
     <>
       <DateBlock dayKey={workout.dayKey} className={compact ? "size-[52px]" : undefined} />
       <span className="flex min-w-0 flex-1 flex-col gap-1 text-left">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-heading text-base font-bold lg:text-[17px]">{workout.name}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="line-clamp-2 min-w-0 font-heading text-base leading-tight font-bold lg:text-[17px]">{workout.name}</span>
           {workout.prCount > 0 && <PrCountBadge count={workout.prCount} compact={compact} />}
           {workout.deload && <DeloadBadge />}
         </span>
@@ -156,7 +156,7 @@ export function WorkoutCard({ workout }: { workout: HistoryWorkout }) {
                   <div className="mb-1.5 flex items-center gap-3">
                     <ExerciseThumb exercise={ex} size="sm" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{name}</p>
+                      <p className="line-clamp-2 text-sm leading-snug font-semibold">{name}</p>
                       <SetsLine exercise={ex} />
                     </div>
                   </div>

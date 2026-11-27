@@ -155,7 +155,7 @@ export function WorkoutEditForm({ workout, today }: { workout: HistoryWorkout; t
         </Link>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold tracking-[0.06em] text-muted-foreground uppercase">{t("title")}</p>
-          <h1 className="truncate font-heading text-xl font-extrabold tracking-tight md:text-[28px]">{workout.name}</h1>
+          <h1 className="line-clamp-2 font-heading text-xl leading-tight font-extrabold tracking-tight md:text-[28px]">{workout.name}</h1>
         </div>
       </header>
 
@@ -206,7 +206,7 @@ export function WorkoutEditForm({ workout, today }: { workout: HistoryWorkout; t
               <legend className="sr-only">{name}</legend>
               <div className="mb-2 flex items-center gap-3">
                 <ExerciseThumb exercise={meta} size="sm" />
-                <p aria-hidden className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+                <p aria-hidden className="line-clamp-2 min-w-0 flex-1 text-[15px] leading-snug font-semibold">
                   {name}
                 </p>
               </div>

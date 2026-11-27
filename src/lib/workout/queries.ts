@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { historyBest, type PersonalBest, type Session } from "@/lib/progression";
+import { DELOAD_SESSIONS, historyBest, withCompletedSets, type PersonalBest, type Session } from "@/lib/progression";
 import type { Database } from "@/types/database.types";
 import { getTemplateNames, templateName } from "@/lib/programs/template-names";
 import { groupSessionRows } from "./history";
@@ -16,8 +16,11 @@ import {
 
 type Client = SupabaseClient<Database>;
 
-/** Скільки останніх тренувань вправи передаємо на клієнт. */
-const RECENT_SESSIONS = 2;
+/**
+ * Скільки останніх тренувань вправи передаємо на клієнт — стільки, скільки
+ * потрібно правилу розвантаження (DELOAD_SESSIONS невдалих поспіль).
+ */
+const RECENT_SESSIONS = DELOAD_SESSIONS;
 /** Верхня межа рядків історії (рекорди рахуються в цих межах). */
 const HISTORY_ROWS_LIMIT = 5000;
 
@@ -73,12 +76,17 @@ export async function loadExerciseSessions(
   );
 }
 
-/** Тренування вправ → два останні (від найновішого) + найкращі показники за всю історію. */
+/**
+ * Тренування вправ → два останні (від найновішого) + найкращі показники за всю історію.
+ * Історія — по вправі з УСІХ завершених тренувань (незалежно від програми);
+ * тренування, де вправу пропустили (жодного виконаного підходу), відкидаються
+ * ДО обрізання до двох, а невиконані підходи — прибираються ("Минулого разу").
+ */
 export function toExerciseHistory(sessions: Map<string, ExerciseSession[]>) {
   const result = new Map<string, ExerciseHistory>();
   for (const [exerciseId, list] of sessions) {
     result.set(exerciseId, {
-      history: list.slice(0, RECENT_SESSIONS).map((s) => ({ sets: s.sets })),
+      history: withCompletedSets(list).slice(0, RECENT_SESSIONS),
       best: historyBest(list),
     });
   }

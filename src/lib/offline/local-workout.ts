@@ -4,6 +4,7 @@
  * підходів і локальний підсумок (ті самі функції summary.ts, що й сервер).
  */
 
+import type { WeightUnit } from "@/lib/units";
 import type { OfflineKit } from "@/lib/workout/queries";
 import { buildWorkoutSummary, type WorkoutSummary } from "@/lib/workout/summary";
 import type { WorkoutExercise, WorkoutInit, WorkoutSet } from "@/lib/workout/types";
@@ -61,6 +62,7 @@ export function buildLocalSummary(
   startedAt: string,
   finishedAt: string,
   nameOf: (exercise: WorkoutExercise) => string = (e) => e.name,
+  unit: WeightUnit = "kg",
 ): WorkoutSummary {
   const order = new Map(state.exercises.map((e, i) => [e.exerciseId, i]));
   const sets = state.sets
@@ -85,6 +87,7 @@ export function buildLocalSummary(
     })),
     sets,
     previous: null,
+    unit,
   });
 }
 

@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useWeightFormat } from "@/components/i18n/use-format";
+import { WhyWeight } from "@/components/progression/why-weight";
 import { cn } from "@/lib/utils";
-import type { Suggestion } from "@/lib/progression";
-import { clampReps, clampWeightKg, REPS_MAX, WEIGHT_MAX_KG } from "@/lib/workout/derive";
+import { isPureBodyweight, type Suggestion } from "@/lib/progression";
+import { explainSuggestion } from "@/lib/progression-explain";
+import { clampReps, clampWeightKg, progressionInput, REPS_MAX, WEIGHT_MAX_KG } from "@/lib/workout/derive";
 import { suggestionReason } from "@/lib/workout/suggestion-text";
 import type { Equipment, MuscleGroup, WorkoutExercise } from "@/lib/workout/types";
 import {
@@ -28,7 +30,7 @@ import {
   type WeightUnit,
 } from "@/lib/units";
 import type { SetResult } from "@/lib/progression";
-import { useWorkout } from "./context";
+import { useScreen, useWorkout } from "./context";
 import { formatElapsed, useNow } from "./hooks";
 
 // ───────────── Теги ─────────────
@@ -84,13 +86,25 @@ export function SuggestionBanner({
   className?: string;
 }) {
   const t = useTranslations("workout.suggestion");
+  const ts = useTranslations("common.suggestion");
   const tr = useTranslations("common.suggestion.reason");
   const fmt = useWeightFormat();
+  const locale = useLocale();
+  const { unit } = useScreen();
   const weight = suggestion.weight === null ? "" : fmt.weight(suggestion.weight);
   const r = suggestionReason(suggestion, exercise);
+  // "Чому така вага?" — з того самого входу, що отримав алгоритм.
+  const why = explainSuggestion({ ...progressionInput(exercise, unit), unit }, suggestion, locale);
+  // Вправа з власною вагою: вага не змінюється — прогресія в повтореннях.
+  const bodyweight = isPureBodyweight(exercise.equipment, exercise.history);
   let text: string;
   let tone: string;
-  switch (suggestion.action) {
+  let reason: string | null;
+  switch (bodyweight ? "bodyweight" : suggestion.action) {
+    case "bodyweight":
+      text = ts("bodyweight");
+      tone = "bg-foreground/10 text-foreground";
+      break;
     case "increase":
       text = t("increase", { weight, delta: fmt.weight(suggestion.delta) });
       tone = "bg-primary text-primary-foreground";
@@ -109,19 +123,29 @@ export function SuggestionBanner({
   }
 
   // Для 'none' пояснення вже на самій плашці.
-  const reason = suggestion.action === "none" ? null : tr(r.key, r.values);
+  if (bodyweight) reason = tr("bodyweight", { repMax: exercise.repMax });
+  else reason = suggestion.action === "none" ? null : tr(r.key, r.values);
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <p
-        className={cn(
-          "inline-flex min-h-11 w-fit max-w-full items-center rounded-full px-5 py-2 text-[15px] font-bold lg:text-base",
-          tone,
-        )}
-      >
-        {text}
-      </p>
-      {reason && <p className="text-sm text-muted-foreground">{reason}</p>}
+      {/* "i" — після рядка причини (плашка лишається на всю ширину); без причини — біля плашки. */}
+      <div className="flex max-w-full items-center gap-1">
+        <p
+          className={cn(
+            "inline-flex min-h-11 w-fit max-w-full min-w-0 items-center rounded-full px-5 py-2 text-[15px] font-bold lg:text-base",
+            tone,
+          )}
+        >
+          {text}
+        </p>
+        {!reason && <WhyWeight text={why} />}
+      </div>
+      {reason && (
+        <p className="-my-1.5 text-sm text-muted-foreground">
+          {reason}
+          <WhyWeight text={why} className="ml-0.5 align-middle" />
+        </p>
+      )}
     </div>
   );
 }
@@ -140,7 +164,11 @@ export function WorkoutClock({ startedAt, className }: { startedAt: number; clas
   );
 }
 
-export function SaveStatus({ className }: { className?: string }) {
+/**
+ * Статус збереження. compact — на телефоні лише іконка (текст — у title і
+ * для скрінрідера), повний текст від sm, щоб рядок не вилазив за екран.
+ */
+export function SaveStatus({ className, compact = false }: { className?: string; compact?: boolean }) {
   const t = useTranslations("workout.sync");
   const status = useWorkout((s) => s.syncStatus);
   const config = {
@@ -153,10 +181,11 @@ export function SaveStatus({ className }: { className?: string }) {
     <span
       role="status"
       aria-live="polite"
-      className={cn("inline-flex items-center gap-2 text-sm whitespace-nowrap", config.cls, className)}
+      title={compact ? config.text : undefined}
+      className={cn("inline-flex shrink-0 items-center gap-2 text-sm whitespace-nowrap", config.cls, className)}
     >
-      <Icon className={cn("size-5", status === "saving" && "animate-spin")} aria-hidden />
-      {config.text}
+      <Icon className={cn("size-5 shrink-0", status === "saving" && "animate-spin")} aria-hidden />
+      <span className={cn(compact && "max-sm:sr-only")}>{config.text}</span>
     </span>
   );
 }
@@ -266,6 +295,10 @@ function Stepper({
     onChange(clamp(next));
   };
   const lg = size === "lg";
+  const shown = draft ?? (value === null ? "" : String(value));
+  // Великий степер на телефоні вузький (~140px): довгі значення ("102.5",
+  // "1102.5") зменшуємо, щоб число не обрізалося.
+  const lgText = shown.length >= 6 ? "text-lg" : shown.length === 5 ? "text-xl" : "text-2xl";
 
   return (
     <div
@@ -280,7 +313,7 @@ function Stepper({
         aria-label={t("decrease", { label })}
         className={cn(
           "flex shrink-0 items-center justify-center rounded-full text-foreground/90 transition hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
-          lg ? "size-12" : "size-8 xl:size-9",
+          lg ? "size-11" : "size-8 xl:size-9",
         )}
       >
         <Minus className={lg ? "size-5" : "size-4"} aria-hidden />
@@ -290,7 +323,7 @@ function Stepper({
         inputMode={integer ? "numeric" : "decimal"}
         enterKeyHint="done"
         autoComplete="off"
-        value={draft ?? (value === null ? "" : String(value))}
+        value={shown}
         placeholder="—"
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => {
@@ -305,8 +338,8 @@ function Stepper({
           if (e.key === "Enter") e.currentTarget.blur();
         }}
         className={cn(
-          "h-full min-w-0 flex-1 bg-transparent text-center font-bold tabular-nums outline-none placeholder:text-muted-foreground focus:bg-foreground/5",
-          lg ? "text-2xl" : "w-11 text-base xl:w-14",
+          "h-full min-w-0 flex-1 bg-transparent px-0 text-center font-bold tabular-nums outline-none placeholder:text-muted-foreground focus:bg-foreground/5",
+          lg ? lgText : "w-11 text-base xl:w-14",
         )}
       />
       <button
@@ -315,7 +348,7 @@ function Stepper({
         aria-label={t("increase", { label })}
         className={cn(
           "flex shrink-0 items-center justify-center rounded-full text-foreground/90 transition hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none active:scale-95",
-          lg ? "size-12" : "size-8 xl:size-9",
+          lg ? "size-11" : "size-8 xl:size-9",
         )}
       >
         <Plus className={lg ? "size-5" : "size-4"} aria-hidden />

@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Info, LayoutGrid } from "lucide-react";
+import { ActiveProgramProvider } from "@/components/programs/active-program";
+import { ChooseActiveProgram } from "@/components/programs/choose-active-program";
 import { ActiveWorkoutBanner } from "@/components/workouts/active-workout-banner";
+import { ProgramSwitcher } from "@/components/workouts/program-switcher";
 import { DayCard } from "@/components/workouts/day-card";
 import { RecentWorkouts } from "@/components/workouts/recent-workouts";
 import { WorkoutsSwitch } from "@/components/history/workouts-switch";
@@ -19,6 +22,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Хаб тренувань: незавершене тренування, старт будь-якого дня активної
  * програми та останні завершені тренування. Повна історія — /workouts/history.
+ * Праворуч від «Почати тренування» — перемикач активної програми; без
+ * активної (але з власними програмами) — «Виберіть активну програму».
  */
 export default async function WorkoutsPage() {
   const user = await getCurrentUser();
@@ -43,12 +48,13 @@ export default async function WorkoutsPage() {
 
       {data.active && <ActiveWorkoutBanner workout={data.active} />}
 
+      <ActiveProgramProvider activeId={data.program?.id ?? null}>
       <section aria-labelledby="start-heading">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="start-heading" className="font-heading text-lg font-bold md:text-xl">
             {t("start")}
           </h2>
-          {data.program && <p className="text-sm text-muted-foreground">{data.program.name}</p>}
+          {data.program && <ProgramSwitcher programs={data.myPrograms} />}
         </div>
 
         {data.program && data.program.days.length > 0 ? (
@@ -65,6 +71,8 @@ export default async function WorkoutsPage() {
               ))}
             </div>
           </>
+        ) : !data.program && data.myPrograms.length > 0 ? (
+          <ChooseActiveProgram programs={data.myPrograms} />
         ) : (
           <div className="flex flex-col items-center rounded-2xl border border-foreground/10 bg-card px-6 py-12 text-center">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-accent-text">
@@ -84,6 +92,7 @@ export default async function WorkoutsPage() {
           </div>
         )}
       </section>
+      </ActiveProgramProvider>
 
       <section aria-labelledby="recent-heading">
         <h2 id="recent-heading" className="mb-3 font-heading text-lg font-bold md:text-xl">

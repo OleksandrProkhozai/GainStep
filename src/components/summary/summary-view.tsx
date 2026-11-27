@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 import { createWeightFormat, formatWeightValue, type WeightFormat, type WeightUnit } from "@/lib/units";
 import type { NextUp, SummaryPageData } from "@/lib/workout/summary-queries";
 import type { SummaryExercise, SummarySet } from "@/lib/workout/summary";
-import { suggestionReason } from "@/lib/workout/suggestion-text";
+import { isPureBodyweight } from "@/lib/progression";
+import { explainSuggestion } from "@/lib/progression-explain";
 import { NotesCard } from "./notes-card";
 import { PlanChangesCard } from "./plan-changes-card";
 import { Card, CardTitle, Confetti, DoneBadge, pill, TrophyBurst } from "./parts";
@@ -300,7 +301,7 @@ function ExercisesCard({
             <li key={ex.exerciseId} className="flex items-center gap-3 py-2.5">
               <ExerciseThumb exercise={{ muscleGroup: ex.muscleGroup ?? "" }} size="sm" />
               <div className="min-w-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-3">
-                <p className="truncate text-[15px] font-medium">{ex.name}</p>
+                <p className="line-clamp-2 text-[15px] leading-snug font-medium">{ex.name}</p>
                 <p className="truncate text-xs text-muted-foreground tabular-nums lg:text-sm">
                   {formatSets(ex.sets, fmt)}
                 </p>
@@ -323,6 +324,8 @@ function ExercisesCard({
 function NextPill({ ex, fmt }: { ex: SummaryExercise; fmt: WeightFormat }) {
   const t = useTranslations("summary.next");
   const base = "inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-bold whitespace-nowrap";
+  // Власна вага: вага не змінюється — без "= так само".
+  if (isPureBodyweight(ex.next.input.equipment, ex.next.input.history)) return null;
   switch (ex.next.action) {
     case "increase":
       return <span className={cn(base, "bg-primary text-primary-foreground")}>↑ +{fmt.weight(ex.next.delta)}</span>;
@@ -345,7 +348,7 @@ function NextTimeCard({
   className?: string;
 }) {
   const t = useTranslations("summary.next");
-  const tr = useTranslations("common.suggestion.reason");
+  const ts = useTranslations("common.suggestion");
   const locale = useLocale();
   const fmt = createWeightFormat(unit, locale);
   return (
@@ -362,20 +365,21 @@ function NextTimeCard({
             const { next } = ex;
             const changed =
               (next.action === "increase" || next.action === "deload") && next.today !== null && next.weight !== null;
+            const bodyweight = isPureBodyweight(next.input.equipment, next.input.history);
             return (
               <li key={ex.exerciseId} className="flex items-center gap-3 py-2.5">
                 <ExerciseThumb exercise={{ muscleGroup: ex.muscleGroup ?? "" }} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-medium">{ex.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(() => {
-                      const r = suggestionReason(next, ex);
-                      return tr(r.key, r.values);
-                    })()}
+                  <p className="line-clamp-2 text-[15px] leading-snug font-medium">{ex.name}</p>
+                  {/* "Чому така вага?" — те саме пояснення, що в "i" на екрані тренування */}
+                  <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                    {explainSuggestion({ ...next.input, unit }, next, locale)}
                   </p>
                 </div>
                 <p className="shrink-0 text-right text-sm font-semibold tabular-nums">
-                  {next.weight === null
+                  {bodyweight
+                    ? ts("bodyweight")
+                    : next.weight === null
                     ? "—"
                     : changed
                       ? `${formatWeightValue(next.today!, unit, locale)} → ${fmt.weight(next.weight)}`
@@ -402,7 +406,7 @@ function NextUpCard({ nextUp, className }: { nextUp: NextUp; className?: string 
       </CardTitle>
       <div className="mt-2 flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-heading text-xl font-extrabold lg:text-2xl">{nextUp.name}</p>
+          <p className="line-clamp-2 font-heading text-xl leading-tight font-extrabold lg:text-2xl">{nextUp.name}</p>
           {nextUp.preview.length > 0 && (
             <p className="truncate text-xs text-muted-foreground lg:text-sm">
               {nextUp.preview.join(", ")}

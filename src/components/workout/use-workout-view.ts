@@ -9,7 +9,7 @@ import {
   setsOf,
   workoutStats,
 } from "@/lib/workout/derive";
-import { useWorkout } from "./context";
+import { useScreen, useWorkout } from "./context";
 
 /** Похідні дані поточної вправи (рахуються з полів стору через useMemo). */
 export function useCurrentExercise() {
@@ -17,6 +17,7 @@ export function useCurrentExercise() {
   const sets = useWorkout((s) => s.sets);
   const index = useWorkout((s) => s.currentIndex);
   const expandedSetId = useWorkout((s) => s.expandedSetId);
+  const { unit } = useScreen();
 
   return useMemo(() => {
     const exercise = exercises[Math.min(index, exercises.length - 1)] ?? null;
@@ -30,14 +31,14 @@ export function useCurrentExercise() {
       total: exercises.length,
       isLast: index >= exercises.length - 1,
       sets: own,
-      suggestion: getSuggestion(exercise),
+      suggestion: getSuggestion(exercise, unit),
       prs: prIds(exercise, sets),
       /** Підхід, з яким працює користувач: розгорнутий або перший невиконаний. */
       activeSet: expanded ?? pending,
       allDone: own.length > 0 && pending === null,
       e1rm: bestE1RMToday(own),
     };
-  }, [exercises, sets, index, expandedSetId]);
+  }, [exercises, sets, index, expandedSetId, unit]);
 }
 
 export type CurrentExercise = NonNullable<ReturnType<typeof useCurrentExercise>>;
